@@ -34,12 +34,13 @@ public:
 private slots:
   void OnStartPCA();
   void OnStartTSNE();
-  void OnPeakListChanged(const QmitkSingleNodeSelectionWidget::NodeList &);
+  void OnStartKMeans();
+  void DoKMeans(const Eigen::MatrixXd& data, int k, std::vector<int>& clusterAssignments);
+
 
 private:
   mitk::Image::Pointer ResampleVectorImage(mitk::Image::Pointer lowResImage, mitk::Image::Pointer referenceImage);
   void SetFocus() override;
-  void EnableWidgets(bool enable);
   QWidget * m_Parent;
 
   Ui::DataCompressionViewControls m_Controls;

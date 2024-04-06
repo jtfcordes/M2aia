@@ -1,5 +1,5 @@
 set(Plugin-Name "Data Compression Plugin")
 set(Plugin-Version "1.0")
-set(Plugin-Vendor "M2aia")
+set(Plugin-Vendor "M²")
 set(Plugin-ContactAddress "https://m2aia.de")
 set(Require-Plugin org.mitk.gui.qt.common)

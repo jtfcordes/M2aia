@@ -26,6 +26,7 @@ found in the LICENSE file.
 #include <m2SpectrumImageHelper.h>
 #include <m2TSNEImageFilter.h>
 #include <m2ImzMLImageIO.h>
+#include <m2SpectrumImageHelper.h>
 
 // mitk
 #include <mitkDockerHelper.h>
@@ -50,10 +51,19 @@ found in the LICENSE file.
 #include <itkResampleImageFilter.h>
 #include <itkShrinkImageFilter.h>
 #include <itkVectorImageToImageAdaptor.h>
+#include <itkVectorImage.h>
+#include <itkVectorIndexSelectionCastImageFilter.h>
+#include <itkImageKmeansModelEstimator.h>
+#include <itkImageRegionIterator.h>
 
 // boost
 #include <berryPlatformUI.h>
 #include <boost/algorithm/string.hpp>
+
+// Eigen
+#include "Eigen/Dense"
+// OpenMP
+#include <omp.h>
 
 // Don't forget to initialize the VIEW_ID.
 const std::string QmitkDataCompressionView::VIEW_ID = "org.mitk.views.m2.datacompression";
@@ -100,159 +110,216 @@ void QmitkDataCompressionView::CreateQtPartControl(QWidget *parent)
   //         &QmitkDataCompressionView::OnImageChanged);
 
   connect(m_Controls.btnRunPCA, SIGNAL(clicked()), this, SLOT(OnStartPCA()));
+  connect(m_Controls.btnRunKMeans, SIGNAL(clicked()), this, SLOT(OnStartKMeans()));
   connect(m_Controls.btnRunTSNE, SIGNAL(clicked()), this, SLOT(OnStartTSNE()));
-  // connect(m_Controls.btnRunSparsePCA, SIGNAL(clicked()), this, SLOT(OnStartSparsePCA()));
-  // connect(m_Controls.btnRunUmap, SIGNAL(clicked()), this, SLOT(OnStartUMAP()));
-
-  // connect(m_Controls.btnExport,
-  //         &QPushButton::clicked,
-  //         this,
-  //         []()
-  //         {
-  //           try
-  //           {
-  //             if (auto platform = berry::PlatformUI::GetWorkbench())
-  //               if (auto workbench = platform->GetActiveWorkbenchWindow())
-  //                 if (auto page = workbench->GetActivePage())
-  //                   if (page.IsNotNull())
-  //                     page->ShowView("org.mitk.views.m2.imzmlexport", "", 1);
-  //           }
-  //           catch (berry::PartInitException &e)
-  //           {
-  //             BERRY_ERROR << "Error: " << e.what() << std::endl;
-  //           }
-  //         });
-
-  // connect(m_Controls.btnPicking,
-  //         &QPushButton::clicked,
-  //         this,
-  //         []()
-  //         {
-  //           try
-  //           {
-  //             if (auto platform = berry::PlatformUI::GetWorkbench())
-  //               if (auto workbench = platform->GetActiveWorkbenchWindow())
-  //                 if (auto page = workbench->GetActivePage())
-  //                   if (page.IsNotNull())
-  //                     page->ShowView("org.mitk.views.m2.peakpicking", "", 1);
-  //           }
-  //           catch (berry::PartInitException &e)
-  //           {
-  //             BERRY_ERROR << "Error: " << e.what() << std::endl;
-  //           }
-  //         });
-
-  // Make sure to have a consistent UI state at the very beginning.
-  // this->OnImageChanged(m_Controls.imageSelection->GetSelectedNodes());
-
-  // m_Controls.lassoLabelImageSelection->SetDataStorage(GetDataStorage());
-  // m_Controls.lassoLabelImageSelection->SetAutoSelectNewNodes(true);
-  // m_Controls.lassoLabelImageSelection->SetNodePredicate(
-  //   mitk::NodePredicateAnd::New(mitk::TNodePredicateDataType<mitk::LabelSetImage>::New(),
-  //                               mitk::NodePredicateNot::New(mitk::NodePredicateProperty::New("helper object"))));
-  // m_Controls.lassoLabelImageSelection->SetSelectionIsOptional(true);
-  // m_Controls.lassoLabelImageSelection->SetEmptyInfo(QString("LabelImage selection"));
-  // m_Controls.lassoLabelImageSelection->SetPopUpTitel(QString("LabelImage"));
-
+ 
 }
 
 void QmitkDataCompressionView::SetFocus() {}
 
-
-void QmitkDataCompressionView::OnPeakListChanged(const QmitkSingleNodeSelectionWidget::NodeList &)
-{
-  this->EnableWidgets(!m_Controls.imageSelection->GetSelectedNodes().empty());
+  
+// Function to calculate Euclidean distance between two points
+double euclideanDistance(const Eigen::VectorXd& point1, const Eigen::VectorXd& point2) {
+    return (point1 - point2).norm();
 }
 
-void QmitkDataCompressionView::EnableWidgets(bool /*enable*/)
-{
-  // m_Controls
+
+void QmitkDataCompressionView::DoKMeans(const Eigen::MatrixXd& data, int k, std::vector<int>& clusterAssignments){
+    // Randomly initialize centroids
+    std::vector<Eigen::VectorXd> centroids(k);
+    for (int i = 0; i < k; ++i) {
+        centroids[i] = data.row(rand() % data.rows());
+    }
+
+    bool centroidsChanged = true;
+    while (centroidsChanged) {
+        centroidsChanged = false;
+
+        // Assign each point to the nearest centroid
+#pragma omp parallel for
+        for (int i = 0; i < data.rows(); ++i) {
+            double minDistance = std::numeric_limits<double>::max();
+            int closestCentroid = -1;
+            for (int j = 0; j < k; ++j) {
+                double distance = euclideanDistance(data.row(i), centroids[j]);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestCentroid = j;
+                }
+            }
+#pragma omp critical
+            {
+                if (clusterAssignments[i] != closestCentroid) {
+                    clusterAssignments[i] = closestCentroid;
+                    centroidsChanged = true;
+                }
+            }
+        }
+
+        // Update centroids
+#pragma omp parallel for
+        for (int i = 0; i < k; ++i) {
+            Eigen::VectorXd newCentroid = Eigen::VectorXd::Zero(data.cols());
+            int count = 0;
+            for (int j = 0; j < data.rows(); ++j) {
+                if (clusterAssignments[j] == i) {
+                    newCentroid += data.row(j);
+                    count++;
+                }
+            }
+            if (count > 0) {
+                newCentroid /= count;
+            }
+#pragma omp critical
+            {
+                centroids[i] = newCentroid;
+            }
+        }
+    }
 }
 
-// void QmitkDataCompressionView::OnStartSparsePCA()
-// {
-//   for (auto node : m_Controls.imageSelection->GetSelectedNodesStdVector())
-//   {
-//     if (auto image = dynamic_cast<m2::SpectrumImage *>(node->GetData()))
-//     {
-//       if (!image->GetIsDataAccessInitialized())
-//         return;
-//       if (image->GetSpectrumType().Format == m2::SpectrumFormat::ContinuousCentroid)
-//       {
-//         if (mitk::DockerHelper::CheckDocker())
-//         {
-//           mitk::DockerHelper helper("ghcr.io/m2aia/extensions:sparse_pca");
-//           m2::SpectrumImageHelper::AddArguments(helper);
-//           helper.AddAutoSaveData(image, "--imzml", "*.imzML");
+// void QmitkDataCompressionView::DoKMeans(unsigned int numberOfClasses){
 
-//           auto iter = helper.AddLoadLaterOutput("--csv", "pca_data.csv");
-//           helper.AddAutoLoadOutput("--image", "pca_data.nrrd");
-//           auto results = helper.GetResults();
+//   using PixelType = float;
+//   constexpr unsigned int Dimension = 3;
+//   using ImageType = itk::VectorImage<PixelType, Dimension>;
 
-//           // convert 3D image to 3D vector image
-//           const auto image = dynamic_cast<mitk::Image *>(results[0].GetPointer());
-//           const auto dims = image->GetDimensions();
-//           const auto components = dims[2];
-//           auto vimage = mitk::HelperUtils::GetVectorImage3D({dims[0], dims[1], 1}, components);
-//           mitk::ImagePixelWriteAccessor<m2::DisplayImagePixelType, 3> outAcc(vimage);
-//           mitk::ImagePixelReadAccessor<float, 3> inAcc(image);
-//           auto targetGeom = vimage->GetGeometry();
-//           auto sourceGeom = image->GetGeometry();
-//           targetGeom->SetSpacing(sourceGeom->GetSpacing());
-//           targetGeom->SetOrigin(sourceGeom->GetOrigin());
+  
+//   using EstimatorType = itk::ImageKmeansModelEstimator<ImageType>;
+//   EstimatorType::Pointer estimator = EstimatorType::New();
+//   estimator->SetInputImage(inputImage);
+//   estimator->SetNumberOfClasses(numberOfClasses);
 
-//           for (unsigned int pixelInSlice = 0; pixelInSlice < dims[0] * dims[1]; ++pixelInSlice)
-//             for (unsigned int i = 0; i < components; ++i)
-//               outAcc.GetData()[pixelInSlice * components + i] = inAcc.GetData()[i * dims[0] * dims[1] + pixelInSlice];
-
-//           // load csv
-//           const auto filePath = helper.GetFilePath(iter->path);
-//           std::ifstream t(filePath);
-//           if (t.good())
-//           {
-//             std::string text((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-//             std::vector<std::string> lines;
-//             boost::split(lines, text, [](char c) { return c == '\n'; });
-//             lines.erase(lines.begin());
-//             lines.erase(lines.rbegin().base());
-
-//             auto *table = m_Controls.sparsePcaTable;
-//             table->clearContents();
-//             table->setRowCount(lines.size());
-//             table->setColumnCount(3);
-//             unsigned int row = 0;
-//             table->blockSignals(true);
-//             table->setHorizontalHeaderLabels({"m/z", "pc", "value"});
-
-//             for (std::string line : lines)
-//             {
-//               boost::erase_all(line, "\"");
-//               std::vector<std::string> words;
-//               boost::split(words, line, [](char c) { return c == ','; });
-
-//               auto item = new QTableWidgetItem(words[1].c_str());
-//               table->setItem(row, 0, item);
-
-//               item = new QTableWidgetItem(words[2].c_str());
-//               table->setItem(row, 1, item);
-
-//               item = new QTableWidgetItem(words[3].c_str());
-//               table->setItem(row, 2, item);
-//               ++row;
-//             }
-//             table->sortByColumn(1);
-//             table->blockSignals(false);
-//           }
-
-//           auto newNode = mitk::DataNode::New();
-//           newNode->SetData(vimage);
-//           newNode->SetName(node->GetName() + "_sparse_pca");
-//           GetDataStorage()->Add(newNode, const_cast<mitk::DataNode *>(node.GetPointer()));
-//         }
-//       }
+//     try {
+//         estimator->Update();
+//     } catch (itk::ExceptionObject & error) {
+//         std::cerr << "Error: " << error << std::endl;
+//         return EXIT_FAILURE;
 //     }
-//   }
+
+//     // Assign labels to each pixel
+//     using LabelImageType = itk::Image<unsigned char, Dimension>;
+//     using AssignFilterType = itk::KmeansModelEstimator<ImageType>::AssignLabelsFilterType;
+//     AssignFilterType::Pointer assignFilter = AssignFilterType::New();
+//     assignFilter->SetInputImage(inputImage);
+//     assignFilter->SetModelEstimator(estimator);
+//     assignFilter->Update();
+
+//     LabelImageType::Pointer labeledImage = assignFilter->GetOutput();
 // }
+
+
+void QmitkDataCompressionView::OnStartKMeans()
+{
+  for (auto imageNode : m_Controls.imageSelection->GetSelectedNodesStdVector())
+  {
+    for (auto vectorNode : m_Controls.peakListSelection->GetSelectedNodesStdVector())
+    {
+      auto image = dynamic_cast<const m2::SpectrumImage *>(imageNode->GetData());
+      if (!image->GetImageAccessInitialized())
+        return;
+
+      auto vector = dynamic_cast<m2::IntervalVector *>(vectorNode->GetData());
+      const auto &intervals = vector->GetIntervals();
+
+      itk::Image<double, 3>::Pointer itkImage;
+      mitk::CastToItkImage(image, itkImage);
+      unsigned int N = image->GetDimension(0) * image->GetDimension(1) * image->GetDimension(2);
+
+      // std::vector<mitk::Image::Pointer> temporaryImages;
+      // auto inputImage = itk::Image<m2::DisplayImagePixelType, 3>::New();
+      // auto region = itkImage->GetLargestPossibleRegion();
+      // region.SetSize(2, intervals.size());
+      // inputImage->SetRegions(region);
+      // inputImage->Allocate();
+
+
+
+      auto progressBar = mitk::ProgressBar::GetInstance();
+
+      auto m = image->GetMaskImage();
+      mitk::ImagePixelReadAccessor<mitk::LabelSetImage::PixelType, 3> maskAcc(m);
+      auto validPixel = std::accumulate(maskAcc.GetData(), maskAcc.GetData() + N, 0);
+
+      Eigen::MatrixXd data(validPixel, intervals.size());
+      MITK_INFO << validPixel << " " << data.cols() << " " << data.rows();
+
+      {
+        auto ionImage = mitk::Image::New();
+        ionImage->Initialize(image);
+
+        progressBar->AddStepsToDo(intervals.size() + 1);
+        for (size_t row = 0; row < intervals.size(); ++row)
+        {
+          progressBar->Progress();
+          const auto mz = intervals.at(row).x.mean();
+          
+          image->GetImage(mz, image->ApplyTolerance(mz), image->GetMaskImage(), ionImage);
+          mitk::ImagePixelReadAccessor<m2::DisplayImagePixelType, 3> acc(ionImage);
+          // std::copy(acc.GetData(), acc.GetData() + N, inputImage->GetBufferPointer() + row * N);
+
+          unsigned v = 0;
+          for(unsigned long i = 0; i < N; ++i)
+          {
+            if( maskAcc.GetData()[i] != 0){
+              data(v, row) = acc.GetData()[i];
+              ++v;
+            }
+          }
+        }
+      }
+
+      // auto result = mitk::Image::New();
+      // mitk::CastToMitkImage(inputImage, result);
+
+      // mitk::DataNode::Pointer node = mitk::DataNode::New();
+      // node->SetData(result);
+      // node->SetName("VectorImage");
+      // this->GetDataStorage()->Add(node);
+  
+
+
+      std::vector<int> clusterAssignments(data.rows(), -1);
+      DoKMeans(data, m_Controls.kmeans_clusters->value(), clusterAssignments);
+      for (int i = 0; i < data.rows(); ++i) {
+        std::cout << "Data point " << i << " assigned to cluster " << clusterAssignments[i] << std::endl;
+      }
+      
+      auto clusteredImage = mitk::LabelSetImage::New();
+      clusteredImage->Initialize(m);
+      clusteredImage->AddLayer(mitk::LabelSet::New());
+      auto labelset = clusteredImage->GetLabelSet(0);
+      for(int i = 0; i < m_Controls.kmeans_clusters->value(); ++i){
+        mitk::Label::Pointer label = mitk::Label::New();
+        label->SetName("Cluster " + std::to_string(i));
+        label->SetValue(i);
+        label->SetOpacity(0.5);
+        label->SetColor(m2::RandomColor());
+        labelset->AddLabel(label);
+      }
+      
+      {
+        mitk::ImagePixelWriteAccessor<mitk::LabelSetImage::PixelType, 3> c_acc(clusteredImage);
+
+        unsigned long v = 0;
+        for(unsigned long i = 0; i < N; ++i)
+        {
+          if( maskAcc.GetData()[i] != 0){
+            c_acc.GetData()[i] = clusterAssignments[v];
+            ++v;
+          }
+        }
+      }
+
+      mitk::DataNode::Pointer node2 = mitk::DataNode::New();
+      node2->SetData(clusteredImage);
+      node2->SetName("ClusteredImage");
+      this->GetDataStorage()->Add(node2);
+
+    }
+  }
+}
+
 
 void QmitkDataCompressionView::OnStartPCA()
 {

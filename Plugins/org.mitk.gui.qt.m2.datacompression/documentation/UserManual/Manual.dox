@@ -1,3 +1,31 @@
 /**
-\page org_mitk_views_m2_datacompression Example Plugin
+\page org_mitk_views_m2_datacompression The M²aia Data Compression View
+
+\imageMacro{icon_data.svg, "Icon of the M²aia Data View", 3}
+
+
+\tableofcontents
+
+\section m2_DataCompression_Introduction Introduction
+
+Data compression plays a crucial role in Mass Spectrometry Imaging (MSI) to efficiently store and analyze large datasets. By reducing the size of the data while preserving its essential information, data compression techniques enable faster data transfer, lower storage requirements, and improved computational efficiency. In this context, the M²aia Data Compression View provides a user-friendly interface to apply various compression algorithms and explore the compressed data in MSI workflows.
+
+\section m2_DataCompression_Usage Usage
+In the "Image selection", multiple MSI datasets can be selected for compression. In the "PeakList selection" a peak list can be selected.
+Based on the peak list, ion images are generated to create a feature matrix for the selected data compression method.
+
+
+Spectral compression methods:
+
+PCA: Principal Component Analysis (PCA) is a widely used technique for dimensionality reduction. It projects the data into a lower-dimensional space by finding the principal components that capture the most variance in the data. The user can specify the number of principal components to retain in the compressed data.
+
+t-SNE: t-Distributed Stochastic Neighbor Embedding (t-SNE) is a nonlinear dimensionality reduction technique that aims to preserve the local structure of the data. The user can specify the parameters as perplexity, Theta, shrink factor, and number of iterations. A PCA image is used as an input for t-SNE to reduce the runtime.
+
+UMAP: is implemented as third-party plugin view (org.mitk.gui.qt.m2.docker.umap) and requires access to local Docker installation. 
+
+Spatial compression methods:
+
+k-means: k-means clustering is an unsupervised learning algorithm that partitions the data into k clusters based on the similarity of the data points. The user can specify the number of clusters to use in the compression.
+
+
 */

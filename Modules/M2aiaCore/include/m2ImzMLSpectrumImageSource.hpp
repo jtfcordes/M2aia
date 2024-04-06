@@ -38,6 +38,73 @@ See LICENSE.txt for details.
 #include <signal/m2RunningMedian.h>
 #include <signal/m2Smoothing.h>
 #include <signal/m2Transformer.h>
+namespace m2{
+  struct BinaryDataAccessHelper{
+
+        unsigned dataOffset;
+        unsigned dataOffsetReverse;
+        unsigned dataModifiedOffset;
+        unsigned dataModifiedOffsetReverse;
+        
+        unsigned dataModifiedLength;
+        unsigned dataPaddingLeft;
+        unsigned dataPaddingRight;
+
+
+    };
+
+    /**
+     * @brief Get the modifed binary data query range for spectral data access.
+     * The range may be modified by requirements of signal processing methods - e.g. baseline correction, smoothing filters
+     */
+    BinaryDataAccessHelper GetBinaryDataAccessHelper(const std::vector<double> &xs, 
+                                                    double xRangeCenter, 
+                                                    double xRangeTol, 
+                                                    unsigned padding,
+                                                    size_t sizeOfElementsInBytes)
+                                                    {
+    
+
+
+
+    // Image generation is based on range operations on the full spectrum for each pixel.
+    // We are not interested in values outside of the range.
+    // We can read only values of interest from the *.ibd file.
+    // For this we have to manipulate the byte offset position.
+    // 1) This is the full spectrum from start '|' to end '|'
+    // |-----------------------------------------------------------------|
+
+    // 2) Subrange from '(' to ')' with center 'c', offset left '>' and offset right '<'
+    // |>>>>>>>>>>>>>>>(********c********)<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<|
+    auto subRes = m2::Signal::Subrange(xs, xRangeCenter - xRangeTol, xRangeCenter + xRangeTol);
+
+    m2::BinaryDataAccessHelper offsetHelper;
+    offsetHelper.dataOffset = subRes.first;
+    offsetHelper.dataOffsetReverse = (xs.size() - (subRes.first + subRes.second));
+
+    // check if padding can be applied on the left side
+    // 3) Pad the range for overcoming border-problems with kernel based operations
+    // |>>>>>>>>>[^^^^^(********c********)^^^^^]<<<<<<<<<<<<<<<<<<<<<<<<<|
+    if(offsetHelper.dataOffset / padding >= padding)
+      offsetHelper.dataPaddingLeft = padding;
+    else
+      offsetHelper.dataPaddingLeft = offsetHelper.dataOffset;
+
+    // check if padding can be applied on the right side
+    if(offsetHelper.dataOffsetReverse / padding >= padding)
+      offsetHelper.dataPaddingRight = padding; 
+    else
+      offsetHelper.dataPaddingRight = offsetHelper.dataOffsetReverse;
+    
+    // 4) We read data from the *ibd from '[' to ']' using a padded left offset
+    // Continue at 5.
+    offsetHelper.dataModifiedLength = subRes.second + offsetHelper.dataPaddingLeft + offsetHelper.dataPaddingRight;
+    offsetHelper.dataModifiedOffset = (subRes.first - offsetHelper.dataPaddingLeft) * sizeOfElementsInBytes;
+    return offsetHelper;
+  }
+
+}
+
 namespace m2
 {
   class ImzMLSpectrumImage;
@@ -51,6 +118,13 @@ namespace m2
   public:
     explicit ImzMLSpectrumImageSource(m2::ImzMLSpectrumImage *owner) : p(owner) {}
     virtual void GetImagePrivate(double mz, double tol, const mitk::Image *mask, mitk::Image *image);
+
+
+
+
+    
+    
+    
     // void GetSpectrumPrivate(unsigned int, std::vector<float> &, std::vector<float> &, unsigned int) override {}
 
     void InitializeImageAccess() override;
@@ -146,6 +220,9 @@ namespace m2
     void GetYValues(unsigned int id, std::vector<OutputType> &yd);
     template <class OutputType>
     void GetXValues(unsigned int id, std::vector<OutputType> &xd);
+
+
+
   };
 
 } // namespace m2
@@ -200,90 +277,89 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeNormal
 
 }
 
+
+
 template <class MassAxisType, class IntensityType>
 void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(double xRangeCenter,
                                                                                 double xRangeTol,
                                                                                 const mitk::Image *mask,
                                                                                 mitk::Image *destImage)
 {
+  using namespace m2;
+
+  std::shared_ptr<mitk::ImagePixelReadAccessor<mitk::LabelSetImage::PixelType, 3>> maskAccess;
+  if (mask)
+    maskAccess.reset(new mitk::ImagePixelReadAccessor<mitk::LabelSetImage::PixelType, 3>(mask));
+
+  if (!destImage)
+    mitkThrow() << "Please provide an image where the data should be written to.";
+  
+  // clear the image conten
+  AccessByItk(destImage, [](auto itkImg) { itkImg->FillBuffer(0); });
+  mitk::ImagePixelWriteAccessor<DisplayImagePixelType, 3> imageAccess(destImage);
+  
+  
+  // Get the normalization type
+  const auto currentType = p->GetNormalizationStrategy();
 
   // Check normalization strategy
-  bool useNormalization = p->GetNormalizationStrategy() != m2::NormalizationStrategyType::None;
-
-  // check if the normalization iamge was already initialized for this type of normalization
-  // and initialize the image if necessary
-  auto currentType = p->GetNormalizationStrategy();
+  const bool useNormalization = p->GetNormalizationStrategy() != m2::NormalizationStrategyType::None;
+  mitk::ImagePixelReadAccessor<NormImagePixelType, 3> normAccess(p->GetNormalizationImage());
+  
+  // check if the normalization image for a given type 
+  // was already initialized. Initialize the image if necessary.
   if(!p->GetNormalizationImageStatus(currentType)){
     InitializeNormalizationImage(currentType);
     p->SetNormalizationImageStatus(currentType, true);
   } 
 
-  AccessByItk(destImage, [](auto itkImg) { itkImg->FillBuffer(0); });
-  using namespace m2;
-  // accessors
-  mitk::ImagePixelWriteAccessor<DisplayImagePixelType, 3> imageAccess(destImage);
-  mitk::ImagePixelReadAccessor<NormImagePixelType, 3> normAccess(p->GetNormalizationImage());
-  std::shared_ptr<mitk::ImagePixelReadAccessor<mitk::LabelSetImage::PixelType, 3>> maskAccess;
+  // Get the profile type
+  const auto spectrumType = p->GetSpectrumType();
+  const auto threads = p->GetNumberOfThreads();
+  
 
-  if (mask)
-    maskAccess.reset(new mitk::ImagePixelReadAccessor<mitk::LabelSetImage::PixelType, 3>(mask));
 
   p->SetProperty("m2aia.xs.selection.center", mitk::DoubleProperty::New(xRangeCenter));
   p->SetProperty("m2aia.xs.selection.tolerance", mitk::DoubleProperty::New(xRangeTol));
   
-  // Profile (continuous) spectrum
-  const auto spectrumType = p->GetSpectrumType();
-  const unsigned threads = p->GetNumberOfThreads();
 
 
+
+  // Access each spectrum with identical binary offset and length parameters
   if (spectrumType.Format == m2::SpectrumFormat::ContinuousProfile)
   {
-    // xRangeCenter subrange
     const auto mzs = p->GetXAxis();
-    const auto _BaselineCorrectionHWS = p->GetBaseLineCorrectionHalfWindowSize();
-    const auto _BaseLineCorrectionStrategy = p->GetBaselineCorrectionStrategy();
+    // Processing parameters
 
-    // Image generation is based on range operations on the full spectrum for each pixel.
-    // We are not interested in values outside of the range.
-    // We can read only values of interest from the *.ibd file.
-    // For this we have to manipulate the byte offset position.
-    // 1) This is the full spectrum from start '|' to end '|'
-    // |-----------------------------------------------------------------|
-
-    // 2) Subrange from '(' to ')' with center 'c', offset left '>' and offset right '<'
-    // |>>>>>>>>>>>>>>>(********c********)<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<|
-    auto subRes = m2::Signal::Subrange(mzs, xRangeCenter - xRangeTol, xRangeCenter + xRangeTol);
+    unsigned padding = 0;
+    if(p->GetBaselineCorrectionStrategy() != m2::BaselineCorrectionType::None)
+      padding = p->GetBaseLineCorrectionHalfWindowSize();
     
-    const unsigned int offset_right = (mzs.size() - (subRes.first + subRes.second));
-    const unsigned int offset_left = subRes.first;
-
-    // 3) Pad the range for overcoming border-problems with kernel based operations
-    // |>>>>>>>>>[^^^^^(********c********)^^^^^]<<<<<<<<<<<<<<<<<<<<<<<<<|
-    const unsigned int padding_left =
-      (offset_left / _BaselineCorrectionHWS >= 1 ? _BaselineCorrectionHWS : offset_left) *
-      (_BaseLineCorrectionStrategy != m2::BaselineCorrectionType::None);
-    const unsigned int padding_right =
-      (offset_right / _BaselineCorrectionHWS >= 1 ? _BaselineCorrectionHWS : offset_right) *
-      (_BaseLineCorrectionStrategy != m2::BaselineCorrectionType::None);
-
-    // 4) We read data from the *ibd from '[' to ']' using a padded left offset
-    // Continue at 5.
-    const auto newLength = subRes.second + padding_left + padding_right;
-    const auto newOffsetModifier = (subRes.first - padding_left) * sizeof(IntensityType);
+    auto binaryDataAccessHelper = GetBinaryDataAccessHelper(mzs, xRangeCenter, xRangeTol, padding, sizeof(IntensityType));
+      
 
     const auto &spectra = p->GetSpectra();
     m2::Process::Map(spectra.size(),
                      threads,
                      [&](auto /*id*/, auto a, auto b)
                      {
+                       // create a input stream for the binary data file
                        std::ifstream f(p->GetBinaryDataPath(), std::iostream::binary);
-                       std::vector<IntensityType> ints(newLength);
-                       std::vector<IntensityType> baseline(newLength);
+
+                       // prepare data vectors for raw data and processing data
+                       std::vector<IntensityType> ints(binaryDataAccessHelper.dataModifiedLength);
+                       std::vector<IntensityType> baseline(binaryDataAccessHelper.dataModifiedLength);
+
                        // 5) (For a specific thread), save the true range positions '(' and ')'
                        // for pooling in the data vector. Continue at 6.
+
+                       // ints contains the padded data. 
                        // |>>>>>>>>>[^^^^^(********c********)^^^^^]<<<<<<<<<<<<<<<<<<<<<<<<<|
-                       auto s = std::next(std::begin(ints), padding_left);
-                       auto e = std::prev(std::end(ints), padding_right);
+                       // s,e are the start and end of the data withput padding
+
+                       // |>>>>>>>>>[^^^^^s********c********e^^^^^]<<<<<<<<<<<<<<<<<<<<<<<<<|
+                       auto s = std::next(std::begin(ints), binaryDataAccessHelper.dataPaddingLeft);
+                       auto e = std::prev(std::end(ints), binaryDataAccessHelper.dataPaddingRight);
 
                        for (unsigned int i = a; i < b; ++i)
                        {
@@ -295,14 +371,16 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
                            imageAccess.SetPixelByIndex(spectrum.index, 0);
                            continue;
                          }
-                         // 6) (For a specific pixel) recalculate the new offset
-                         // |>>>>>>>>>[^^^^^(********c********)^^^^^]<<<<<<<<<<<<<<<<<<<<<<<<<|
-                         const auto newOffset = spectrum.intOffset + newOffsetModifier; // new offset
-                         binaryDataToVector(f, newOffset, newLength, ints.data());
+                         // 6) access the binary data in the file.
+                         // - use the spectrum.intOffset to find spectrum data in the binary file
+                         // - add the offset to find the right subrange of the spectrum data 
+                         const auto newOffset = spectrum.intOffset + binaryDataAccessHelper.dataModifiedOffset;
+                         // access the binary data and read a (padded) subrange of the intensities (y values)
+                         binaryDataToVector(f, newOffset, binaryDataAccessHelper.dataModifiedLength, ints.data());
 
                          // ----- Normalization
                          if (useNormalization)
-                         { // check if it is not NormalizationStrategy::None.
+                         { 
                            IntensityType norm = normAccess.GetPixelByIndex(spectrum.index);
                            std::transform(
                              std::begin(ints), std::end(ints), std::begin(ints), [&norm](auto &v) { return v / norm; });
