@@ -1,5 +1,5 @@
-set(Plugin-Name "M2aia Position")
+set(Plugin-Name "M²aia Position")
 set(Plugin-Version "0.1")
-set(Plugin-Vendor "Mannheim University of Applied Sciences")
-set(Plugin-ContactAddress "j.cordes@hs-mannheim.de")
+set(Plugin-Vendor "M2")
+set(Plugin-ContactAddress "https://m2aia.de")
 set(Require-Plugin org.mitk.gui.qt.common)

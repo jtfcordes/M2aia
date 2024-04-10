@@ -22,7 +22,7 @@ if(CPACK_GENERATOR MATCHES "NSIS")
   SET(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\icon.ico")
   SET(CPACK_NSIS_HELP_LINK "http:\\\\www.github.com/m2aia/")
   SET(CPACK_NSIS_URL_INFO_ABOUT "http:\\\\www.github.com/m2aia/")
-  SET(CPACK_NSIS_CONTACT j.cordes@hs-mannheim.de)
+  SET(CPACK_NSIS_CONTACT jtfc@posteo.de)
   SET(CPACK_NSIS_MODIFY_PATH ON)
 
 endif(CPACK_GENERATOR MATCHES "NSIS")

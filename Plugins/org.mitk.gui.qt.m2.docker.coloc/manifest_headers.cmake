@@ -1,4 +1,4 @@
-set(Plugin-Name "Example Plugin")
+set(Plugin-Name "coloc Plugin")
 set(Plugin-Version "1.0")
 set(Plugin-Vendor "M2")
 set(Plugin-ContactAddress "https://m2aia.de")
