@@ -76,7 +76,7 @@ void QmitkMoleculaRView::EnableWidgets(bool enable)
 
 void QmitkMoleculaRView::OnStartMoleculaR()
 {
-  if (mitk::DockerHelper::CheckDocker())
+  if (mitk::DockerHelper::CanRunDocker())
   {
     for (auto node : m_Controls.imageSelection->GetSelectedNodes())
     {

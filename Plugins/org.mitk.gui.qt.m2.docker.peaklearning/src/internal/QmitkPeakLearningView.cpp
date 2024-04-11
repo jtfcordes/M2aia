@@ -65,7 +65,7 @@ void QmitkPeakLearningView::EnableWidgets(bool enable)
 
 void QmitkPeakLearningView::OnStartDockerProcessing()
 {
-  if (mitk::DockerHelper::CheckDocker())
+  if (mitk::DockerHelper::CanRunDocker())
   {
     for (auto node : m_Controls.imageSelection->GetSelectedNodes())
     {

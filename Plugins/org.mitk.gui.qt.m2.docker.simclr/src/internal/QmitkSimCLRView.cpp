@@ -72,7 +72,7 @@ void QmitkSimCLRView::EnableWidgets(bool enable)
 
 void QmitkSimCLRView::OnStartDockerProcessing()
 {
-  if (mitk::DockerHelper::CheckDocker())
+  if (mitk::DockerHelper::CanRunDocker())
   {
     for (auto centroidNode : m_Controls.centroidsSeceltion->GetSelectedNodesStdVector())
       for (auto imageNode : m_Controls.imageSelection->GetSelectedNodesStdVector())
