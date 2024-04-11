@@ -28,7 +28,6 @@ namespace m2
     {
     private:
       IntensityTransformationType m_strategy;
-      int m_hws;
 
     public:
       void Initialize(IntensityTransformationType strategy)
