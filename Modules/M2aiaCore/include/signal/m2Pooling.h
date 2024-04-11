@@ -44,7 +44,8 @@ namespace m2
           val = *std::max_element(first, last);
           break;
         case RangePoolingStrategyType::Median:
-          val = m2::Signal::Median(first, last);
+          std::vector<typename ItFirst::value_type> v(first, last);
+          val = m2::Signal::Median(v.begin(),v.end());
           break;
       }
 
