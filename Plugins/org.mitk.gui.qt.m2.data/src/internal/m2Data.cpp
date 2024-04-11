@@ -505,11 +505,6 @@ void m2Data::ApplySettingsToImage(m2::SpectrumImage *data)
     data->SetRangePoolingStrategy(GuiToRangePoolingStrategyType());
     data->SetIntensityTransformationStrategy(GuiToIntensityTransformationStrategyType());
 
-    // if (data->GetSmoothingStrategy() == m2::SmoothingType::Gaussian)
-    // {
-    //   auto d = int(m_Controls.spnBxSigma->value() * 4 + 0.5);
-    //   m_Controls.spnBxSmoothing->setValue(d);
-    // }
     data->SetSmoothingHalfWindowSize(m_Controls.spnBxSmoothing->value());
     data->SetBaseLineCorrectionHalfWindowSize(m_Controls.spnBxBaseline->value());
     data->SetUseToleranceInPPM(m_Controls.rbtnTolPPM->isChecked());
@@ -603,19 +598,19 @@ void m2Data::OnGenerateImageData(qreal xRangeCenter, qreal xRangeTol)
 
   if (nodesToProcess->empty())
     return;
+
   if (xRangeTol < 0){
     xRangeTol = Controls()->spnBxTol->value();
     bool isPpm = Controls()->rbtnTolPPM->isChecked();
     xRangeTol = isPpm ? m2::PartPerMillionToFactor(xRangeTol) * xRangeCenter : xRangeTol;
   }
 
-  emit m2::UIUtils::Instance()->RangeChanged(xRangeCenter, xRangeTol);
   
+  emit m2::UIUtils::Instance()->RangeChanged(xRangeCenter, xRangeTol);
   this->m_Controls.spnBxMz->setValue(xRangeCenter);
   auto flag = std::make_shared<std::atomic<bool>>(0);
 
   QString labelText = str(boost::format("%.4f +/- %.2f Da") % xRangeCenter % xRangeTol).c_str();
-  this->UpdateTextAnnotations(labelText.toStdString());
 
   if (nodesToProcess->size() == 1)
   {
@@ -627,7 +622,13 @@ void m2Data::OnGenerateImageData(qreal xRangeCenter, qreal xRangeTol)
     }
     labelText = QString(node->GetName().c_str()) + "\n" + labelText;
   }
+  
+  this->UpdateTextAnnotations(labelText.toStdString());
 
+  // set GUI settings to the selected nodes
+  ApplySettingsToNodes(nodesToProcess);
+
+  // process all nodes
   for (mitk::DataNode::Pointer dataNode : *nodesToProcess)
     if (m2::SpectrumImage::Pointer data = dynamic_cast<m2::SpectrumImage *>(dataNode->GetData()))
       OnGenerateImageData(dataNode, xRangeCenter, xRangeTol, false); // do not emit

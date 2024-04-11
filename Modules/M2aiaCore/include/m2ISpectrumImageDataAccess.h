@@ -41,7 +41,15 @@ namespace m2
     virtual void GetIntensities(unsigned int id,
                      std::vector<double> &xs) const = 0;
 
-    virtual void GetImage(double mz, double tol, const mitk::Image *mask, mitk::Image *img) const = 0;
+
+    /// @brief Reduces spectral data to image gray values.
+    // x: Postion on the x axis of each spectrum in the pixel
+    // tol: interval range around x+/-tol
+    // mask: region where image data is generated (if null the whole image region is queried)
+    // image: generated ray values will be stored in the given image ()
+    // This method can be used to delegate calls to the previously initialized processor object (m2::InitializeProcessor)
+    // This method may access the initialized image structures (m2::InitializeGeometry)
+    virtual void GetImage(double x, double tol, const mitk::Image *mask, mitk::Image *img) const = 0;
   };
 
 } // namespace m2

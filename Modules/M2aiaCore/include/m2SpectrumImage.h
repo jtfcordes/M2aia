@@ -34,14 +34,22 @@ See LICENSE.txt for details.
 
 namespace m2
 {
-
+  /**
+   * Base class for all spectrum images. 
+   * Provides access to helper images, including normalization images, mask image, and index image.
+   * Provides access to the spectrum data, including maximum, sum, and mean spectra.
+   * 
+  */
   class M2AIACORE_EXPORT SpectrumImage : public ISpectrumImageDataAccess, public mitk::Image
   {
   public:
     
-    using SpectrumArtifactDataType = double;
-    using SpectrumArtifactVectorType = std::vector<SpectrumArtifactDataType>;
-    using SpectrumArtifactMapType = std::map<m2::SpectrumType, SpectrumArtifactVectorType>;
+    /**
+     * Store spe
+    */
+    using SpectrumArtifactMapType = std::map<m2::SpectrumType, std::vector<double>>;
+    
+    
 
     struct NormalizationImageData{mitk::Image::Pointer image; bool isInitialized = false;};
 
@@ -87,7 +95,35 @@ namespace m2
 
     itkGetMacro(SpectraArtifacts, SpectrumArtifactMapType &);
     itkGetConstReferenceMacro(SpectraArtifacts, SpectrumArtifactMapType);
+  
+    itkGetMacro(NormalizationImages, NormalizationImageMapType &);
+    itkGetConstReferenceMacro(NormalizationImages, NormalizationImageMapType);
 
+    itkGetMacro(MaskImage, mitk::Image::Pointer);
+    itkGetConstMacro(MaskImage, mitk::Image::Pointer);
+    itkSetMacro(MaskImage, mitk::Image::Pointer);
+
+    itkGetMacro(IndexImage, mitk::Image::Pointer);
+    itkGetConstMacro(IndexImage, mitk::Image::Pointer);
+    itkSetMacro(IndexImage, mitk::Image::Pointer);
+
+    itkGetMacro(Points, mitk::PointSet::Pointer);
+    itkGetConstMacro(Points, mitk::PointSet::Pointer);
+    itkSetMacro(Points, mitk::PointSet::Pointer);
+
+    std::vector<double> &GetSkylineSpectrum();
+    std::vector<double> &GetSumSpectrum();
+    std::vector<double> &GetMeanSpectrum();
+    std::vector<double> &GetXAxis();
+    const std::vector<double> &GetXAxis() const;
+
+    itkSetEnumMacro(ImageGeometryInitialized, bool);
+    itkGetEnumMacro(ImageGeometryInitialized, bool);
+
+    itkSetEnumMacro(ImageAccessInitialized, bool);
+    itkGetEnumMacro(ImageAccessInitialized, bool);
+
+    // -- methods to be implemented in derived class
     /// @brief Return and if necessary prepare the normalization image for the *currently* selected normalization method
     virtual mitk::Image::Pointer GetNormalizationImage();
 
@@ -109,41 +145,38 @@ namespace m2
     /// @brief Get the initialization status of normalization image
     virtual bool GetNormalizationImageStatus(m2::NormalizationStrategyType type);
 
-    
-
-    itkGetMacro(NormalizationImages, NormalizationImageMapType &);
-    itkGetConstReferenceMacro(NormalizationImages, NormalizationImageMapType);
-
-    itkGetMacro(MaskImage, mitk::Image::Pointer);
-    itkGetConstMacro(MaskImage, mitk::Image::Pointer);
-    itkSetMacro(MaskImage, mitk::Image::Pointer);
-
-    itkGetMacro(IndexImage, mitk::Image::Pointer);
-    itkGetConstMacro(IndexImage, mitk::Image::Pointer);
-    itkSetMacro(IndexImage, mitk::Image::Pointer);
-
-    itkGetMacro(Points, mitk::PointSet::Pointer);
-    itkGetConstMacro(Points, mitk::PointSet::Pointer);
-    itkSetMacro(Points, mitk::PointSet::Pointer);
-
-    SpectrumArtifactVectorType &GetSkylineSpectrum();
-    SpectrumArtifactVectorType &GetSumSpectrum();
-    SpectrumArtifactVectorType &GetMeanSpectrum();
-    SpectrumArtifactVectorType &GetXAxis();
-    const SpectrumArtifactVectorType &GetXAxis() const;
-
-    itkSetEnumMacro(ImageGeometryInitialized, bool);
-    itkGetEnumMacro(ImageGeometryInitialized, bool);
-
-    itkSetEnumMacro(ImageAccessInitialized, bool);
-    itkGetEnumMacro(ImageAccessInitialized, bool);
-
-    virtual void InitializeImageAccess() = 0;
-    virtual void InitializeGeometry() = 0;
+    // Initialize the SpectrumImages's processor object
     virtual void InitializeProcessor() = 0;
+
+    /// @brief Override GetImage of the interface ISpectrumImageDataAccess
+    void GetImage(double x, double tol, const mitk::Image *mask, mitk::Image *img) const override;
+
+    /// @brief Initialize the SpectrumImage's geometry
+    // - Set the origin
+    // - Set the image dimensions in x,y,z
+    // - Set the pixel spacing in x,y,z
+    // - Initialize normalization images with the same geometry parameters
+    // - Initialize the mask images with the same geometry parameters
+    // - Initialize the index images with the same geometry parameters
+    virtual void InitializeGeometry() = 0;
+
+    /// @brief This method is called after the Processor and the Geometry is initalized.
+    // Initializes all necessary data required for raw data access to image data.
+    // This method can be used to delegate calls to the previously initialized processor object (m2::InitializeProcessor)
+    // This method may access the initialized image structures (m2::InitializeGeometry)
+    // Initialize images: 
+    // - all kind of normalization images (TIC, RMS, ..)
+    // - the index image (mapping of imzML spectrum indices in the image domain - e.g used for image queries)
+    // - the image mask (Background: 0 - pixel with no/invalid spectral data, Foreground: 1 - pixels with valid spectral data)
+    // Initialize spectra: 
+    // - overview spectra (e.g. mean, skyline/maximum)
+    virtual void InitializeImageAccess() = 0;
+
+    /// @brief This method is called during the InitializeImageAccess call.
     virtual void InitializeNormalizationImage(m2::NormalizationStrategyType /*type*/) =0;
 
-    void GetImage(double mz, double tol, const mitk::Image *mask, mitk::Image *img) const override;
+
+
     // void InsertImageArtifact(const std::string &key, mitk::Image *img);
 
     template <class T>
@@ -171,14 +204,18 @@ namespace m2
     double m_BinningTolerance = 50;
     int m_NumberOfBins = 2000;
     double mutable m_CurrentX = -1;
-
+    
+    /// @brief If true - 
     bool m_UseToleranceInPPM = true;
     
-        /// @brief Image access is only valid if this was set to true from the image source
+    /// @brief Image access is only valid if this was set to true from the image source
     bool m_ImageAccessInitialized = false;
     
     /// @brief Image access is only valid if this was set to true from the image I/O
     bool m_ImageGeometryInitialized = false;
+
+    /// @brief If true - the image is loaded with fixed import settings
+    bool m_UseFixedImportSettings = false;
 
     std::shared_ptr<m2::ElxRegistrationHelper> m_ElxRegistrationHelper;
 
@@ -208,7 +245,7 @@ namespace m2
     SpectrumImage();
     ~SpectrumImage() override;
 
-    SpectrumArtifactVectorType m_XAxis;
+    std::vector<double> m_XAxis;
   };
 
   itkEventMacroDeclaration(InitializationFinishedEvent, itk::AnyEvent);

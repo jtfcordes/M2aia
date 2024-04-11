@@ -148,27 +148,27 @@ void m2::SpectrumImage::ApplyGeometryOperation(mitk::Operation *op)
   }
 }
 
-m2::SpectrumImage::SpectrumArtifactVectorType &m2::SpectrumImage::GetSkylineSpectrum()
+std::vector<double> &m2::SpectrumImage::GetSkylineSpectrum()
 {
   return m_SpectraArtifacts[(SpectrumType::Maximum)];
 }
 
-m2::SpectrumImage::SpectrumArtifactVectorType &m2::SpectrumImage::GetMeanSpectrum()
+std::vector<double> &m2::SpectrumImage::GetMeanSpectrum()
 {
   return m_SpectraArtifacts[(SpectrumType::Mean)];
 }
 
-m2::SpectrumImage::SpectrumArtifactVectorType &m2::SpectrumImage::GetSumSpectrum()
+std::vector<double> &m2::SpectrumImage::GetSumSpectrum()
 {
   return m_SpectraArtifacts[(SpectrumType::Sum)];
 }
 
-m2::SpectrumImage::SpectrumArtifactVectorType &m2::SpectrumImage::GetXAxis()
+std::vector<double> &m2::SpectrumImage::GetXAxis()
 {
   return m_XAxis;
 }
 
-const m2::SpectrumImage::SpectrumArtifactVectorType &m2::SpectrumImage::GetXAxis() const
+const std::vector<double> &m2::SpectrumImage::GetXAxis() const
 {
   return m_XAxis;
 }

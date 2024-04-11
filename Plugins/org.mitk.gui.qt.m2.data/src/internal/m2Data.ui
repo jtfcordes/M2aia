@@ -344,16 +344,6 @@
         </item>
        </layout>
       </item>
-      <item>
-       <widget class="QLabel" name="label_7">
-        <property name="text">
-         <string>Changing the smoothing/baseline correction/transformation methods does not necessarily require a reload of the MSI data set. But to reflect the new conditions in the overview spectra, a reload is required.</string>
-        </property>
-        <property name="wordWrap">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
      </layout>
     </widget>
    </item>

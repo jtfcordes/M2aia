@@ -57,14 +57,14 @@ namespace m2{
      * @brief Get the modifed binary data query range for spectral data access.
      * The range may be modified by requirements of signal processing methods - e.g. baseline correction, smoothing filters
      */
-    BinaryDataAccessHelper GetBinaryDataAccessHelper(const std::vector<double> &xs, 
+    template <class MassAxisType>
+    BinaryDataAccessHelper GetBinaryDataAccessHelper(const std::vector<MassAxisType> &xs, 
                                                     double xRangeCenter, 
                                                     double xRangeTol, 
-                                                    unsigned padding,
-                                                    size_t sizeOfElementsInBytes)
+                                                    unsigned padding)
                                                     {
     
-
+    // MITK_INFO << "(GetBinaryDataAccessHelper) " << xs.empty() << " " << xs.size();
 
 
     // Image generation is based on range operations on the full spectrum for each pixel.
@@ -80,26 +80,36 @@ namespace m2{
 
     m2::BinaryDataAccessHelper offsetHelper;
     offsetHelper.dataOffset = subRes.first;
+    // MITK_INFO << "(GetBinaryDataAccessHelper) [offsetHelper.dataOffset]" << offsetHelper.dataOffset;
+    
     offsetHelper.dataOffsetReverse = (xs.size() - (subRes.first + subRes.second));
+    // MITK_INFO << "(GetBinaryDataAccessHelper) [offsetHelper.dataOffsetReverse]" << offsetHelper.dataOffsetReverse;
 
     // check if padding can be applied on the left side
     // 3) Pad the range for overcoming border-problems with kernel based operations
     // |>>>>>>>>>[^^^^^(********c********)^^^^^]<<<<<<<<<<<<<<<<<<<<<<<<<|
-    if(offsetHelper.dataOffset / padding >= padding)
+    if(offsetHelper.dataOffset / padding >= 1)
       offsetHelper.dataPaddingLeft = padding;
     else
       offsetHelper.dataPaddingLeft = offsetHelper.dataOffset;
+    // MITK_INFO << "(GetBinaryDataAccessHelper) [offsetHelper.dataPaddingLeft]" << offsetHelper.dataPaddingLeft;
 
     // check if padding can be applied on the right side
-    if(offsetHelper.dataOffsetReverse / padding >= padding)
+    if(offsetHelper.dataOffsetReverse / padding >= 1)
       offsetHelper.dataPaddingRight = padding; 
     else
       offsetHelper.dataPaddingRight = offsetHelper.dataOffsetReverse;
+    // MITK_INFO << "(GetBinaryDataAccessHelper) [offsetHelper.dataPaddingRight]" << offsetHelper.dataPaddingRight;
     
     // 4) We read data from the *ibd from '[' to ']' using a padded left offset
     // Continue at 5.
     offsetHelper.dataModifiedLength = subRes.second + offsetHelper.dataPaddingLeft + offsetHelper.dataPaddingRight;
-    offsetHelper.dataModifiedOffset = (subRes.first - offsetHelper.dataPaddingLeft) * sizeOfElementsInBytes;
+    // MITK_INFO << "(GetBinaryDataAccessHelper) [offsetHelper.dataModifiedLength]" << offsetHelper.dataModifiedLength;
+    
+    offsetHelper.dataModifiedOffset = subRes.first - offsetHelper.dataPaddingLeft;
+    // MITK_INFO << "(GetBinaryDataAccessHelper) [offsetHelper.dataModifiedOffset]" << offsetHelper.dataModifiedOffset;
+
+
     return offsetHelper;
   }
 
@@ -109,6 +119,11 @@ namespace m2
 {
   class ImzMLSpectrumImage;
 
+  /**
+   * @class ImzMLSpectrumImageSource
+   * @brief A class that represents a source of spectrum images in the ImzML format.
+   * 
+   */
   template <class MassAxisType, class IntensityType>
   class ImzMLSpectrumImageSource : public m2::ISpectrumImageSource
   {
@@ -119,17 +134,18 @@ namespace m2
     explicit ImzMLSpectrumImageSource(m2::ImzMLSpectrumImage *owner) : p(owner) {}
     virtual void GetImagePrivate(double mz, double tol, const mitk::Image *mask, mitk::Image *image);
 
-
-
-
-    
-    
-    
-    // void GetSpectrumPrivate(unsigned int, std::vector<float> &, std::vector<float> &, unsigned int) override {}
-
-    void InitializeImageAccess() override;
+    /**
+    * @brief Initialize the geometry of the image.
+    * This method initializes the geometry of the image by setting the image size, origin, spacing, and direction.
+    * 
+    */
     void InitializeGeometry() override;
     
+    /**
+     * @brief Initialize the image access.
+     * This method initializes the image access by setting the normalization image, mask image, and index image.
+    */
+    void InitializeImageAccess() override;
     
     virtual void InitializeImageAccessContinuousProfile();
 
@@ -287,6 +303,14 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
 {
   using namespace m2;
 
+  m_Smoother.Initialize(p->GetSmoothingStrategy(), p->GetSmoothingHalfWindowSize());
+  m_BaselineSubtractor.Initialize(p->GetBaselineCorrectionStrategy(), p->GetBaseLineCorrectionHalfWindowSize());
+  m_Transformer.Initialize(p->GetIntensityTransformationStrategy());
+
+  MITK_INFO <<" p->GetIntensityTransformationStrategy() " << (unsigned int)(p->GetIntensityTransformationStrategy());
+  MITK_INFO <<" p->GetBaselineCorrectionStrategy() " << (unsigned int)(p->GetBaselineCorrectionStrategy());
+  MITK_INFO <<" p->GetSmoothingStrategy() " << (unsigned int)(p->GetSmoothingStrategy());
+  
   std::shared_ptr<mitk::ImagePixelReadAccessor<mitk::LabelSetImage::PixelType, 3>> maskAccess;
   if (mask)
     maskAccess.reset(new mitk::ImagePixelReadAccessor<mitk::LabelSetImage::PixelType, 3>(mask));
@@ -328,14 +352,12 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
   // Access each spectrum with identical binary offset and length parameters
   if (spectrumType.Format == m2::SpectrumFormat::ContinuousProfile)
   {
-    const auto mzs = p->GetXAxis();
-    // Processing parameters
-
     unsigned padding = 0;
     if(p->GetBaselineCorrectionStrategy() != m2::BaselineCorrectionType::None)
       padding = p->GetBaseLineCorrectionHalfWindowSize();
     
-    auto binaryDataAccessHelper = GetBinaryDataAccessHelper(mzs, xRangeCenter, xRangeTol, padding, sizeof(IntensityType));
+    const auto mzs = p->GetXAxis();
+    auto binaryDataAccessHelper = GetBinaryDataAccessHelper<double>(mzs, xRangeCenter, xRangeTol, padding);
       
 
     const auto &spectra = p->GetSpectra();
@@ -374,9 +396,9 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
                          // 6) access the binary data in the file.
                          // - use the spectrum.intOffset to find spectrum data in the binary file
                          // - add the offset to find the right subrange of the spectrum data 
-                         const auto newOffset = spectrum.intOffset + binaryDataAccessHelper.dataModifiedOffset;
+                         const auto binaryFileOffset = spectrum.intOffset + binaryDataAccessHelper.dataModifiedOffset * sizeof(IntensityType);
                          // access the binary data and read a (padded) subrange of the intensities (y values)
-                         binaryDataToVector(f, newOffset, binaryDataAccessHelper.dataModifiedLength, ints.data());
+                         binaryDataToVector(f, binaryFileOffset, binaryDataAccessHelper.dataModifiedLength, ints.data());
 
                          // ----- Normalization
                          if (useNormalization)
@@ -429,15 +451,21 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
           binaryDataToVector(
             f, spectrum.mzOffset, spectrum.mzLength, mzs.data()); // !! read mass axis for each spectrum
 
-          auto subRes = m2::Signal::Subrange(mzs, xRangeCenter - xRangeTol, xRangeCenter + xRangeTol);
-          if (subRes.second == 0)
+
+          
+
+          auto binaryDataAccessHelper = GetBinaryDataAccessHelper<MassAxisType>(mzs, xRangeCenter, xRangeTol, 0);
+          ints.resize(binaryDataAccessHelper.dataModifiedLength);
+          
+          
+          if (binaryDataAccessHelper.dataModifiedLength == 0)
           {
             imageAccess.SetPixelByIndex(spectrum.index, 0);
             continue;
           }
 
-          ints.resize(subRes.second);
-          binaryDataToVector(f, spectrum.intOffset + subRes.first * sizeof(IntensityType), subRes.second, ints.data());
+          const auto binaryFileOffset = spectrum.intOffset + binaryDataAccessHelper.dataModifiedOffset * sizeof(IntensityType);
+          binaryDataToVector(f,binaryFileOffset , binaryDataAccessHelper.dataModifiedLength, ints.data());
 
           // TODO: Is it useful to normalize centroid data?
           if (useNormalization)
@@ -574,6 +602,11 @@ template <class MassAxisType, class IntensityType>
 void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageAccess()
 {
   p->SetImageAccessInitialized(false);
+
+  m_Transformer.Initialize(p->GetIntensityTransformationStrategy());
+  m_BaselineSubtractor.Initialize(p->GetBaselineCorrectionStrategy(), p->GetBaseLineCorrectionHalfWindowSize());
+  m_Smoother.Initialize(p->GetSmoothingStrategy(), p->GetSmoothingHalfWindowSize());
+
   //////////---------------------------
   const auto spectrumType = p->GetSpectrumType();
 
@@ -664,9 +697,7 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
   using NormImageReadAccess = mitk::ImagePixelReadAccessor<NormImagePixelType, 3>;
   NormImageReadAccess accNorm(p->GetNormalizationImage(currentType)); 
 
-  m_Smoother.Initialize(p->GetSmoothingStrategy(), p->GetSmoothingHalfWindowSize());
-  m_BaselineSubtractor.Initialize(p->GetBaselineCorrectionStrategy(), p->GetBaseLineCorrectionHalfWindowSize());
-  m_Transformer.Initialize(p->GetIntensityTransformationStrategy());
+  
 
   auto &spectra = p->GetSpectra();
 
@@ -687,6 +718,7 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
         binaryDataToVector(f, spectrum.intOffset, spectrum.intLength, ints.data());
         const auto nFac = accNorm.GetPixelByIndex(spectrum.index);
         
+        // Signal processing
         std::transform(std::begin(ints),
                        std::end(ints),
                        std::begin(ints),

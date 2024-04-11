@@ -160,15 +160,15 @@ namespace m2
     }
 
     binSize = (max - min) / double(bins);
-    using SpectrumVector = m2::SpectrumImage::SpectrumArtifactVectorType;
-    SpectrumVector xSumVec(bins);
-    SpectrumVector hits(bins);
+    
+    std::vector<double> xSumVec(bins);
+    std::vector<double> hits(bins);
 
-    SpectrumVector ySumVec = GetSumSpectrum();
+    std::vector<double> ySumVec = GetSumSpectrum();
     ySumVec.resize(bins, 0);
-    SpectrumVector yMeanVec = GetMeanSpectrum();
+    std::vector<double> yMeanVec = GetMeanSpectrum();
     yMeanVec.resize(bins, 0);
-    SpectrumVector yMaxVec = GetSkylineSpectrum();
+    std::vector<double> yMaxVec = GetSkylineSpectrum();
     yMaxVec.resize(bins, 0);
 
     for (auto &transformer : m_SliceTransformers)
@@ -196,13 +196,13 @@ namespace m2
       }
     }
 
-    SpectrumVector &xVecFinal = GetXAxis();
+    std::vector<double> &xVecFinal = GetXAxis();
     xVecFinal.clear();
-    SpectrumVector &ySumVecFinal = GetSumSpectrum();
+    std::vector<double> &ySumVecFinal = GetSumSpectrum();
     ySumVecFinal.clear();
-    SpectrumVector &yMeanVecFinal = GetMeanSpectrum();
+    std::vector<double> &yMeanVecFinal = GetMeanSpectrum();
     yMeanVecFinal.clear();
-    SpectrumVector &yMaxVecFinal = GetSkylineSpectrum();
+    std::vector<double> &yMaxVecFinal = GetSkylineSpectrum();
     yMaxVecFinal.clear();
 
     for (int k = 0; k < bins; ++k)
