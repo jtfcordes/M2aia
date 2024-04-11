@@ -18,10 +18,11 @@ See LICENSE.txt for details.
 #include <M2aiaCoreExports.h>
 #include <algorithm>
 #include <functional>
+#include <cmath>
 #include <mitkExceptionMacro.h>
 #include <numeric>
-#include <signal/m2SignalCommon.h>
 #include <vector>
+#include <signal/m2SignalCommon.h>
 
 namespace m2
 {
