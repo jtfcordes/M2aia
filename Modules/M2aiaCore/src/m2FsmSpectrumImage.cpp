@@ -28,21 +28,14 @@ See LICENSE.txt for details.
 #include <signal/m2RunningMedian.h>
 #include <signal/m2Smoothing.h>
 
-
-void m2::FsmSpectrumImage::GetImage(double mz, double tol, const mitk::Image *mask, mitk::Image *img) const{
-  m_Processor->GetImagePrivate(mz, tol, mask, img);
-}
-
-void m2::FsmSpectrumImage::FsmProcessor::GetImagePrivate(double cmInv,
-                                                            double tol,
-                                                            const mitk::Image *mask,
-                                                            mitk::Image *destImage)
+void m2::FsmSpectrumImage::GetImage(double cmInv, double tol, const mitk::Image *mask, mitk::Image *destImage) const
 {
+
   AccessByItk(destImage, [](auto itkImg) { itkImg->FillBuffer(0); });
   using namespace m2;
   // accessors
   mitk::ImagePixelWriteAccessor<DisplayImagePixelType, 3> imageAccess(destImage);
-  
+
   std::shared_ptr<mitk::ImagePixelReadAccessor<mitk::LabelSetImage::PixelType, 3>> maskAccess;
 
   MITK_INFO("FSM") << "Image generation started!";
@@ -52,79 +45,61 @@ void m2::FsmSpectrumImage::FsmProcessor::GetImagePrivate(double cmInv,
     maskAccess.reset(new mitk::ImagePixelReadAccessor<mitk::LabelSetImage::PixelType, 3>(mask));
     MITK_INFO << "> Use mask image";
   }
-  p->SetProperty("cm^-1", mitk::DoubleProperty::New(cmInv));
-  p->SetProperty("tol", mitk::DoubleProperty::New(tol));
-  auto mdMz = itk::MetaDataObject<double>::New();
-  mdMz->SetMetaDataObjectValue(cmInv);
-  auto mdTol = itk::MetaDataObject<double>::New();
-  mdTol->SetMetaDataObjectValue(tol);
-  p->GetMetaDataDictionary()["cm^-1"] = mdMz;
-  p->GetMetaDataDictionary()["tol"] = mdTol;
+  
+  GetPropertyList()->SetProperty("cm¯¹", mitk::DoubleProperty::New(cmInv));
+  GetPropertyList()->SetProperty("tol", mitk::DoubleProperty::New(tol));
+  
 
-  const auto &xs = p->GetXAxis();
+  const auto &xs = GetXAxis();
   std::vector<double> kernel;
 
   // Profile (continuous) spectrum
 
   const auto subRes = m2::Signal::Subrange(xs, cmInv - tol, cmInv + tol);
-  const auto n = p->GetSpectra().size();
+  const unsigned long n = m_Spectra.size();
   // map all spectra to several threads for processing
-  const unsigned t = p->GetNumberOfThreads();
+  const unsigned int t = GetNumberOfThreads();
+  
 
   m2::Process::Map(n,
                    t,
                    [&](auto /*id*/, auto a, auto b)
                    {
-                     auto &spectra = p->GetSpectra();
                      for (unsigned int i = a; i < b; ++i)
                      {
-                       auto &spectrum = spectra[i];
+                       auto &spectrum = m_Spectra[i];
                        auto &ys = spectrum.data;
                        auto s = std::next(std::begin(ys), subRes.first);
                        auto e = std::next(std::begin(ys), subRes.first + subRes.second);
 
-                       if (maskAccess && maskAccess->GetPixelByIndex(spectrum.index) == 0)
-                       {
-                         imageAccess.SetPixelByIndex(spectrum.index, 0);
-                         continue;
-                       }
+                      //  if (maskAccess && maskAccess->GetPixelByIndex(spectrum.index) == 0)
+                      //  {
+                      //    imageAccess.SetPixelByIndex(spectrum.index, 0);
+                      //    continue;
+                      //  }
 
-                       const auto val = Signal::RangePooling<float>(s, e, p->GetRangePoolingStrategy());
-                       imageAccess.SetPixelByIndex(spectrum.index, val);
+                      
+                      imageAccess.SetPixelByIndex(spectrum.index, Signal::RangePooling<float>(s, e, GetRangePoolingStrategy()));
                      }
                    });
 }
 
 void m2::FsmSpectrumImage::InitializeProcessor()
 {
-  this->m_Processor.reset((m2::ISpectrumImageSource *)new FsmProcessor(this));
+  // this->m_Processor.reset((m2::ISpectrumImageSource *)new FsmProcessor(this));
 }
 
 void m2::FsmSpectrumImage::InitializeGeometry()
 {
-  if (!m_Processor)
-    this->InitializeProcessor();
-  this->m_Processor->InitializeGeometry();
-  this->SetImageGeometryInitialized(true);
-}
-
-void m2::FsmSpectrumImage::InitializeImageAccess()
-{
-  this->m_Processor->InitializeImageAccess();
-  this->SetImageAccessInitialized(true);
-}
-
-void m2::FsmSpectrumImage::FsmProcessor::InitializeGeometry()
-{
   
+  std::array<itk::SizeValueType, 3> imageSize = {GetPropertyValue<unsigned>("dim_x"), // n_x
+                                                 GetPropertyValue<unsigned>("dim_y"), // n_y
+                                                 GetPropertyValue<unsigned>("dim_z")};
 
-  std::array<itk::SizeValueType, 3> imageSize = {p->GetPropertyValue<unsigned>("dim_x"), // n_x
-                                                 p->GetPropertyValue<unsigned>("dim_y"), // n_y
-                                                 p->GetPropertyValue<unsigned>("dim_z")};
-
-  std::array<double, 3> imageOrigin = {p->GetPropertyValue<double>("[IMS:1000053] absolute position offset x") * 0.001, // x_init
-                                       p->GetPropertyValue<double>("[IMS:1000054] absolute position offset y") * 0.001, // y_init
-                                       p->GetPropertyValue<double>("absolute position offset z") * 0.001};
+  std::array<double, 3> imageOrigin = {
+    GetPropertyValue<double>("[IMS:1000053] absolute position offset x") * 0.001, // x_init
+    GetPropertyValue<double>("[IMS:1000054] absolute position offset y") * 0.001, // y_init
+    GetPropertyValue<double>("absolute position offset z") * 0.001};
 
   using ImageType = itk::Image<m2::DisplayImagePixelType, 3>;
   auto itkIonImage = ImageType::New();
@@ -147,9 +122,9 @@ void m2::FsmSpectrumImage::FsmProcessor::InitializeGeometry()
   o[2] = imageOrigin[2];
 
   //
-  s[0] = p->GetPropertyValue<double>("spacing_x"); // x_delta
-  s[1] = p->GetPropertyValue<double>("spacing_y"); // y_delta
-  s[2] = p->GetPropertyValue<double>("spacing_z");
+  s[0] = GetPropertyValue<double>("spacing_x"); // x_delta
+  s[1] = GetPropertyValue<double>("spacing_y"); // y_delta
+  s[2] = GetPropertyValue<double>("spacing_z");
 
   auto d = itkIonImage->GetDirection();
   d[0][0] = -1;
@@ -163,9 +138,9 @@ void m2::FsmSpectrumImage::FsmProcessor::InitializeGeometry()
     auto caster = itk::CastImageFilter<ImageType, LocalImageType>::New();
     caster->SetInput(itkIonImage);
     caster->Update();
-    p->InitializeByItk(caster->GetOutput());
+    InitializeByItk(caster->GetOutput());
 
-    mitk::ImagePixelWriteAccessor<m2::DisplayImagePixelType, 3> acc(p);
+    mitk::ImagePixelWriteAccessor<m2::DisplayImagePixelType, 3> acc(this);
     std::memset(acc.GetData(), 0, imageSize[0] * imageSize[1] * imageSize[2] * sizeof(m2::DisplayImagePixelType));
   }
 
@@ -175,7 +150,7 @@ void m2::FsmSpectrumImage::FsmProcessor::InitializeGeometry()
     caster->SetInput(itkIonImage);
     caster->Update();
     auto indexImage = mitk::Image::New();
-    p->SetIndexImage(indexImage);
+    SetIndexImage(indexImage);
     indexImage->InitializeByItk(caster->GetOutput());
 
     mitk::ImagePixelWriteAccessor<m2::IndexImagePixelType, 3> acc(indexImage);
@@ -184,9 +159,9 @@ void m2::FsmSpectrumImage::FsmProcessor::InitializeGeometry()
 
   {
     mitk::LabelSetImage::Pointer image = mitk::LabelSetImage::New();
-    p->SetMaskImage(image.GetPointer());
+    SetMaskImage(image.GetPointer());
 
-    image->Initialize((mitk::Image *)p);
+    image->Initialize((mitk::Image *)this);
     auto ls = image->GetActiveLabelSet();
 
     mitk::Color color;
@@ -200,24 +175,27 @@ void m2::FsmSpectrumImage::FsmProcessor::InitializeGeometry()
     ls->AddLabel(label);
   }
 
-  mitk::ImagePixelWriteAccessor<m2::DisplayImagePixelType, 3> acc(p);
-  auto max_dim0 = p->GetDimensions()[0];
-  auto max_dim1 = p->GetDimensions()[1];
+  mitk::ImagePixelWriteAccessor<m2::DisplayImagePixelType, 3> acc(this);
+  auto max_dim0 = GetDimensions()[0];
+  auto max_dim1 = GetDimensions()[1];
   acc.SetPixelByIndex({0, 0, 0}, 1);
   acc.SetPixelByIndex({0, max_dim1 - 1, 0}, max_dim1 / 2);
   acc.SetPixelByIndex({max_dim0 - 1, 0, 0}, max_dim0 / 2);
   acc.SetPixelByIndex({max_dim0 - 1, max_dim1 - 1, 0}, max_dim1 + max_dim0);
+
+  this->SetImageGeometryInitialized(true);
 }
 
-void m2::FsmSpectrumImage::FsmProcessor::InitializeImageAccess()
+void m2::FsmSpectrumImage::InitializeImageAccess()
 {
   using namespace m2;
-  
-  auto accMask = std::make_shared<mitk::ImagePixelWriteAccessor<mitk::LabelSetImage::PixelType, 3>>(p->GetMaskImage());
-  auto accIndex = std::make_shared<mitk::ImagePixelWriteAccessor<m2::IndexImagePixelType, 3>>(p->GetIndexImage());
-  // auto accNorm = std::make_shared<mitk::ImagePixelWriteAccessor<m2::NormImagePixelType, 3>>(p->GetNormalizationImage());
 
-  auto &xs = p->GetXAxis();
+  auto accMask = std::make_shared<mitk::ImagePixelWriteAccessor<mitk::LabelSetImage::PixelType, 3>>(GetMaskImage());
+  auto accIndex = std::make_shared<mitk::ImagePixelWriteAccessor<m2::IndexImagePixelType, 3>>(GetIndexImage());
+  // auto accNorm = std::make_shared<mitk::ImagePixelWriteAccessor<m2::NormImagePixelType,
+  // 3>>(GetNormalizationImage());
+
+  auto &xs = GetXAxis();
 
   // ----- PreProcess -----
 
@@ -226,29 +204,29 @@ void m2::FsmSpectrumImage::FsmProcessor::InitializeImageAccess()
   std::vector<std::vector<double>> skylineT;
   std::vector<std::vector<double>> sumT;
 
-  p->SetPropertyValue<unsigned>("m2aia.xs.n", xs.size());
-  p->SetPropertyValue<double>("m2aia.xs.min", xs.front());
-  p->SetPropertyValue<double>("m2aia.xs.max", xs.back());
+  SetPropertyValue<unsigned>("m2aia.xs.n", xs.size());
+  SetPropertyValue<double>("m2aia.xs.min", xs.front());
+  SetPropertyValue<double>("m2aia.xs.max", xs.back());
 
-  skylineT.resize(p->GetNumberOfThreads(), std::vector<double>(xs.size(), 0));
-  sumT.resize(p->GetNumberOfThreads(), std::vector<double>(xs.size(), 0));
+  skylineT.resize(GetNumberOfThreads(), std::vector<double>(xs.size(), 0));
+  sumT.resize(GetNumberOfThreads(), std::vector<double>(xs.size(), 0));
 
   // m2::Timer t("Initialize image");
 
   m2::Process::Map(
-    p->GetSpectra().size(),
-    p->GetNumberOfThreads(),
+    GetSpectra().size(),
+    GetNumberOfThreads(),
     [&](unsigned int t, unsigned int a, unsigned int b)
     {
       m2::Signal::SmoothingFunctor<float> Smoother;
-      Smoother.Initialize(p->GetSmoothingStrategy(), p->GetSmoothingHalfWindowSize());
+      Smoother.Initialize(GetSmoothingStrategy(), GetSmoothingHalfWindowSize());
 
       m2::Signal::BaselineFunctor<float> BaselineSubtractor;
-      BaselineSubtractor.Initialize(p->GetBaselineCorrectionStrategy(), p->GetBaseLineCorrectionHalfWindowSize());
+      BaselineSubtractor.Initialize(GetBaselineCorrectionStrategy(), GetBaseLineCorrectionHalfWindowSize());
 
       std::vector<float> baseline(xs.size());
 
-      auto &spectra = p->GetSpectra();
+      auto &spectra = GetSpectra();
 
       // const auto divides = [&val](const auto &a) { return a / val; };
       const auto maximum = [](const auto &a, const auto &b) { return a > b ? a : b; };
@@ -259,7 +237,7 @@ void m2::FsmSpectrumImage::FsmProcessor::InitializeImageAccess()
         auto &spectrum = spectra[i];
         auto &ys = spectrum.data;
 
-        Smoother(std::begin(ys),std::end(ys));
+        Smoother(std::begin(ys), std::end(ys));
         BaselineSubtractor(std::begin(ys), std::end(ys), std::begin(baseline));
 
         std::transform(std::begin(ys), std::end(ys), sumT.at(t).begin(), sumT.at(t).begin(), plus);
@@ -267,9 +245,9 @@ void m2::FsmSpectrumImage::FsmProcessor::InitializeImageAccess()
       }
     });
 
-  const auto &spectra = p->GetSpectra();
+  const auto &spectra = GetSpectra();
   m2::Process::Map(spectra.size(),
-                   p->GetNumberOfThreads(),
+                   GetNumberOfThreads(),
                    [&](unsigned int /*t*/, unsigned int a, unsigned int b)
                    {
                      for (unsigned int i = a; i < b; i++)
@@ -280,32 +258,36 @@ void m2::FsmSpectrumImage::FsmProcessor::InitializeImageAccess()
                      }
                    });
 
-  auto &skyline = p->GetSkylineSpectrum();
+  auto &skyline = GetSkylineSpectrum();
   skyline.resize(xs.size(), 0);
-  for (unsigned int t = 0; t < p->GetNumberOfThreads(); ++t)
+  for (unsigned int t = 0; t < GetNumberOfThreads(); ++t)
     std::transform(skylineT[t].begin(),
                    skylineT[t].end(),
                    skyline.begin(),
                    skyline.begin(),
                    [](auto &a, auto &b) { return a > b ? a : b; });
 
-  auto &mean = p->GetMeanSpectrum();
-  auto &sum = p->GetSumSpectrum();
+  auto &mean = GetMeanSpectrum();
+  auto &sum = GetSumSpectrum();
 
   mean.resize(xs.size(), 0);
   sum.resize(xs.size(), 0);
 
   // accumulate valid spectra defined by mask image
   auto N = std::accumulate(accMask->GetData(),
-                           accMask->GetData() + p->GetSpectra().size(),
+                           accMask->GetData() + GetSpectra().size(),
                            mitk::LabelSetImage::PixelType(0),
                            [](const auto &a, const auto &b) -> mitk::LabelSetImage::PixelType { return a + (b > 0); });
 
-  for (unsigned int t = 0; t < p->GetNumberOfThreads(); ++t)
+  for (unsigned int t = 0; t < GetNumberOfThreads(); ++t)
     std::transform(
       sumT[t].begin(), sumT[t].end(), sum.begin(), sum.begin(), [](const auto &a, const auto &b) { return a + b; });
   std::transform(sum.begin(), sum.end(), mean.begin(), [&N](const auto &a) { return a / double(N); });
+
+
+  this->SetImageAccessInitialized(true);
 }
+
 
 m2::FsmSpectrumImage::~FsmSpectrumImage()
 {
@@ -315,7 +297,7 @@ m2::FsmSpectrumImage::~FsmSpectrumImage()
 m2::FsmSpectrumImage::FsmSpectrumImage()
 {
   MITK_INFO << GetStaticNameOfClass() << " created!";
-  
-  m_SpectrumType.XAxisLabel = "cm^-1";
+
+  m_SpectrumType.XAxisLabel = "cm¯¹";
   m_SpectrumType.Format = m2::SpectrumFormat::ContinuousProfile;
 }
