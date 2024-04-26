@@ -250,7 +250,6 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeNormal
   // initialize the normalization iamge
   auto image = p->GetNormalizationImage(type);
   
-  
   // create a write accessor
   using WriteAccessorType = mitk::ImagePixelWriteAccessor<NormImagePixelType, 3>;
   auto accNorm = std::make_shared<WriteAccessorType>(image);
@@ -307,9 +306,9 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
   m_BaselineSubtractor.Initialize(p->GetBaselineCorrectionStrategy(), p->GetBaseLineCorrectionHalfWindowSize());
   m_Transformer.Initialize(p->GetIntensityTransformationStrategy());
 
-  MITK_INFO <<" p->GetIntensityTransformationStrategy() " << (unsigned int)(p->GetIntensityTransformationStrategy());
-  MITK_INFO <<" p->GetBaselineCorrectionStrategy() " << (unsigned int)(p->GetBaselineCorrectionStrategy());
-  MITK_INFO <<" p->GetSmoothingStrategy() " << (unsigned int)(p->GetSmoothingStrategy());
+  // MITK_INFO <<" p->GetIntensityTransformationStrategy() " << (unsigned int)(p->GetIntensityTransformationStrategy());
+  // MITK_INFO <<" p->GetBaselineCorrectionStrategy() " << (unsigned int)(p->GetBaselineCorrectionStrategy());
+  // MITK_INFO <<" p->GetSmoothingStrategy() " << (unsigned int)(p->GetSmoothingStrategy());
   
   std::shared_ptr<mitk::ImagePixelReadAccessor<mitk::LabelSetImage::PixelType, 3>> maskAccess;
   if (mask)
@@ -582,13 +581,8 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeGeomet
       std::memset(acc.GetData(), 1, imageSize[0] * imageSize[1] * imageSize[2] * sizeof(m2::NormImagePixelType));
     }
     
-    
-      
     p->InitializeNormalizationImage(type);
     p->SetNormalizationImageStatus(type,true);
-  
-
-  
   }
 
   mitk::ImagePixelWriteAccessor<m2::DisplayImagePixelType, 3> acc(p);
@@ -863,7 +857,11 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
   int binsN;
   if(auto *preferencesService = mitk::CoreServices::GetPreferencesService())
     if(auto *preferences = preferencesService->GetSystemPreferences())
-      binsN = preferences->GetInt("m2aia.view.spectrum.bins", 1500);
+      {
+      binsN = preferences->GetInt("m2aia.view.spectrum.bins", 15000);
+      MITK_INFO << "Generating processed Centroid/Profile imzML overview spectra )";
+      MITK_INFO << "Number of bins: " << binsN << " (can be changed in the preferences: Window->Preferences->M2aia)";
+      }
 
   auto &spectra = p->GetSpectra();
   const auto &T = p->GetNumberOfThreads();

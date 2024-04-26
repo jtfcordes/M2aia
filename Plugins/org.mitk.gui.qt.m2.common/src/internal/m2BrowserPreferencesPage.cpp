@@ -56,7 +56,7 @@ void m2BrowserPreferencesPage::CreateQtControl(QWidget* parent)
 	m_Ui->setupUi(m_Control);
 
 	// init widgets	
-	auto bins = m_Preferences->GetInt("m2aia.view.spectrum.bins", 1500);
+	auto bins = m_Preferences->GetInt("m2aia.view.spectrum.bins", 15000);
 	m_Ui->spnBxBins->setValue(bins);
 
 	m_Ui->useMaxIntensity->setChecked(m_Preferences->GetBool("m2aia.view.spectrum.useMaxIntensity", true));

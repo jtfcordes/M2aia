@@ -144,7 +144,7 @@ namespace m2
     std::list<m2::Interval> peaks;
     auto* preferencesService = mitk::CoreServices::GetPreferencesService();
     auto* preferences = preferencesService->GetSystemPreferences();
-    const auto bins = preferences->GetInt("m2aia.view.spectrum.bins", 1500);
+    const auto bins = preferences->GetInt("m2aia.view.spectrum.bins", 15000);
     //    const auto normalizationStrategy = GetNormalizationStrategy();
 
     double max = 0;

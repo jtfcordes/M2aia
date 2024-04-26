@@ -235,7 +235,7 @@ int m2::SeriesDataProvider::FindLoD(double xMin, double xMax) const
 
   auto* preferencesService = mitk::CoreServices::GetPreferencesService();
   auto* preferences = preferencesService->GetSystemPreferences();
-  auto pointsWanted = preferences->GetInt("m2aia.view.spectrum.bins", 1500);
+  auto pointsWanted = preferences->GetInt("m2aia.view.spectrum.bins", 15000);
 
   int level, levelIndex = 0;
   const auto wantedDensity = pointsWanted / double(xMax - xMin);
