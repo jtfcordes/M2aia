@@ -47,7 +47,7 @@ See LICENSE.txt or https://www.github.com/jtfcordes/m2aia for details.
 namespace m2
 {
   MicroscopyTiffImageIO::MicroscopyTiffImageIO()
-    : AbstractFileIO(mitk::Image::GetStaticNameOfClass(), MICROSCOPYTIFF_MIMETYPE(), "ITK TIFFImageIO (microscopy)")
+    : AbstractFileIO(mitk::Image::GetStaticNameOfClass(), MICROSCOPYTIFF_MIMETYPE(), "ITK TIFFImageIO (m2aia)")
   {
     AbstractFileWriter::SetRanking(0);
     AbstractFileReader::SetRanking(0);
@@ -56,14 +56,11 @@ namespace m2
 
     // defaultOptions[OPTION_MERGE_POINTS()] = us::Any(true);
     defaultOptions[A_IMPORT_VOLUME] = us::Any(true);
-    defaultOptions[B_SPLIT_CHANNELS] = us::Any(true);
-    defaultOptions[C_REMOVE_DUPLICATES] = us::Any(true);
     defaultOptions[D_THICKNESS] = us::Any(10.0f);
 
     defaultOptions[E_USE_USER_DEFS] = us::Any(false);
     defaultOptions[F_PIXEL_SIZE_X] = us::Any(10.0f);
     defaultOptions[G_PIXEL_SIZE_Y] = us::Any(10.0f);
-
     this->SetDefaultReaderOptions(defaultOptions);
 
     this->RegisterService();
@@ -79,7 +76,7 @@ namespace m2
 
     // cast result and make shared pointer, remove from list
     mitk::Image::Pointer image = dynamic_cast<mitk::Image *>(resultVec.back().GetPointer());
-    resultVec.pop_back();
+    
     
     // adapt spacing
     auto spacing = image->GetGeometry()->GetSpacing();
@@ -95,49 +92,48 @@ namespace m2
     const std::array<unsigned int, 3> dims{D[0], D[1], 1};
     const auto N = std::accumulate(D, D + image->GetDimension(), 1, std::multiplies<unsigned int>());
     const auto imagePixelType = image->GetPixelType();
+    const auto dimensions = image->GetDimension();
+    const auto numComponents = imagePixelType.GetNumberOfComponents();
+    
+    // const bool splitChannels = us::any_cast<bool>(GetReaderOption(B_SPLIT_CHANNELS));
+    // const bool importVolume = us::any_cast<bool>(GetReaderOption(A_IMPORT_VOLUME));
 
-    if (us::any_cast<bool>(GetReaderOption(B_SPLIT_CHANNELS)) && imagePixelType.GetNumberOfComponents() >= 3 &&
-        image->GetDimension() == 2)
-    {
-      const auto lambda = [&](auto itkImage) {
+    MITK_INFO << "Components:" << numComponents;
+    MITK_INFO << "Dimensions:" << dimensions;
+    MITK_INFO << "PixelType:" << imagePixelType.GetComponentTypeAsString();
+
+    // split components
+    if(numComponents >= 3){
+      resultVec.pop_back();
+      const auto splitRGB = [&](auto itkImage) {
         using RGBAPixelType = typename std::remove_pointer<decltype(itkImage)>::type::PixelType;
         using PixelType = typename RGBAPixelType::ComponentType;
         const auto newPixelType = mitk::MakePixelType<itk::Image<PixelType, 3>>(1);
 
-        for (unsigned int i = 0; i < imagePixelType.GetNumberOfComponents(); ++i)
+        for (unsigned int i = 0; i < numComponents; ++i)
         {
           auto slice = mitk::Image::New();
-          if (us::any_cast<bool>(GetReaderOption(A_IMPORT_VOLUME)))
-          {
-            slice->Initialize(newPixelType, 3, dims.data());
-            mitk::ImagePixelWriteAccessor<PixelType, 3> sAcc(slice);
-            std::transform(itkImage->GetBufferPointer(),
-                           itkImage->GetBufferPointer() + N,
-                           sAcc.GetData(),
-                           [&i](const RGBAPixelType &d) { return d.GetElement(i); });
-          }
-          else
-          {
-            slice->Initialize(newPixelType, 2, dims.data());
-            mitk::ImagePixelWriteAccessor<PixelType, 2> sAcc(slice);
-            std::transform(itkImage->GetBufferPointer(),
-                           itkImage->GetBufferPointer() + N,
-                           sAcc.GetData(),
-                           [&i](const RGBAPixelType &d) { return d.GetElement(i); });
-          }
+          slice->Initialize(newPixelType, dims.size(), dims.data());
+          mitk::ImagePixelWriteAccessor<PixelType, 3> sAcc(slice);
+          std::transform(itkImage->GetBufferPointer(),
+                          itkImage->GetBufferPointer() + N,
+                          sAcc.GetData(),
+                          [&i](const RGBAPixelType &d) { return d.GetElement(i); });
+        
+        
           slice->SetSpacing(spacing);
           resultVec.push_back(slice);
         }
       };
-      AccessFixedPixelTypeByItk(image, lambda, RGB_PIXEL_TYPE_SEQUENCE);
+
+      AccessFixedPixelTypeByItk(image, splitRGB, RGB_PIXEL_TYPE_SEQUENCE);
 
       if (us::any_cast<bool>(GetReaderOption(C_REMOVE_DUPLICATES)))
       {
         decltype(resultVec) noDuplicates;
-        while (resultVec.size())
+        for (unsigned int i = 0; i < numComponents; ++i)
         {
-          auto tmp = resultVec.back();
-          resultVec.pop_back();
+          auto tmp = resultVec[i];
           using namespace std;
           if (any_of(begin(noDuplicates), end(noDuplicates), [&tmp](auto current) {
                 return mitk::Equal(*dynamic_cast<mitk::Image *>(tmp.GetPointer()),
@@ -151,9 +147,11 @@ namespace m2
         }
         resultVec = std::move(noDuplicates);
       }
+
     }
-    else if (us::any_cast<bool>(GetReaderOption(A_IMPORT_VOLUME)) && imagePixelType.GetNumberOfComponents() == 1 &&
-             image->GetDimension() == 2)
+
+
+    else if (us::any_cast<bool>(GetReaderOption(A_IMPORT_VOLUME)) && image->GetDimension() == 2)
     {
       resultVec.pop_back();
       const auto lambda = [&](auto itkImage) {
