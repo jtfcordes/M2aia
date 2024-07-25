@@ -47,14 +47,17 @@ void m2Position::CreateQtPartControl(QWidget *parent)
   // create GUI widgets from the Qt Designer's .ui file
   m_Controls.setupUi(parent);
 
-  auto rotateLeft = [this]() { this->Rotate(-5); };
-  auto rotateRight = [this]() { this->Rotate(5); };
+  auto rotateLeft = [this]() { this->Rotate(-0.1); };
+  auto rotateRight = [this]() { this->Rotate(0.1); };
 
-  connect(m_Controls.btnPlus5, &QPushButton::clicked, rotateRight);
+  connect(m_Controls.btnPlus1, &QPushButton::clicked, [this]() { this->Rotate(1); });
+  connect(m_Controls.btnPlus5, &QPushButton::clicked, [this]() { this->Rotate(5); });
   connect(m_Controls.btnPlus15, &QPushButton::clicked, [this]() { this->Rotate(15); });
   connect(m_Controls.btnPlus45, &QPushButton::clicked, [this]() { this->Rotate(45); });
   connect(m_Controls.btnPlus90, &QPushButton::clicked, [this]() { this->Rotate(90); });
-  connect(m_Controls.btnMinus5, &QPushButton::clicked, rotateLeft);
+  
+  connect(m_Controls.btnMinus1, &QPushButton::clicked, [this]() { this->Rotate(-1); });
+  connect(m_Controls.btnMinus5, &QPushButton::clicked, [this]() { this->Rotate(-5); });
   connect(m_Controls.btnMinus15, &QPushButton::clicked, [this]() { this->Rotate(-15); });
   connect(m_Controls.btnMinus45, &QPushButton::clicked, [this]() { this->Rotate(-45); });
   connect(m_Controls.btnMinus90, &QPushButton::clicked, [this]() { this->Rotate(-90); });
@@ -176,7 +179,7 @@ void m2Position::Mirror(int w)
   }
 }
 
-void m2Position::Rotate(int angleDeg)
+void m2Position::Rotate(float angleDeg)
 {
   QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
   if (nodes.empty())

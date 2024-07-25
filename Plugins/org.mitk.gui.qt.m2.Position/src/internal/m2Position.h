@@ -51,7 +51,7 @@ protected:
                                   const QList<mitk::DataNode::Pointer> &nodes) override;
 
   /// \brief Called when the user clicks the GUI button
-  void Rotate(int angleDeg);
+  void Rotate(float angleDeg);
   void Mirror(int angleDeg);
   void Move(std::array<int,2> && vec);
   
