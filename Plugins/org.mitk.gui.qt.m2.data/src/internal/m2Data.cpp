@@ -47,6 +47,7 @@ See LICENSE.txt for details.
 #include <mitkNodePredicateOr.h>
 #include <mitkNodePredicateProperty.h>
 #include <mitkImagePixelWriteAccessor.h>
+#include <mitkImageVtkMapper2D.h>
 #include <regex>
 
 const std::string m2Data::VIEW_ID = "org.mitk.views.m2.data";
@@ -142,7 +143,6 @@ void m2Data::CreateQtPartControl(QWidget *parent)
         if (dNode->GetName().find(name) != std::string::npos)
         {
           dNode->SetVisibility(isChecked);
-
           if (!isChecked)
             dNode->SetBoolProperty("helper object", true);
           else
@@ -157,9 +157,6 @@ void m2Data::CreateQtPartControl(QWidget *parent)
   int i = 1;
   for (m2::NormalizationStrategyType type : m2::NormalizationStrategyTypeList)
   {
-    if (type == m2::NormalizationStrategyType::None)
-      continue;
-
     auto ckBox = new QCheckBox(("Show " + m2::to_string(type) + " normalization images").c_str(), m_Controls.settings);
     QHBoxLayout *layout = (QHBoxLayout *)(m_Controls.settings->layout());
     layout->insertWidget(layout->indexOf(m_Controls.hLineNormImages) + i, ckBox);
@@ -542,7 +539,7 @@ void m2Data::OnGenerateImageData(mitk::DataNode::Pointer node,
     if (!data->IsInitialized())
       mitkThrow() << "Trying to grab an ion image but data access was not initialized properly!";
 
-    mitk::Image::Pointer maskImage;
+    mitk::Image::Pointer maskImage = data->GetMaskImage();
 
     // The smartpointer will stay alive until all captured copies are relesed. Additional
     // all connected signals must be disconnected to make sure that the future is not kept
@@ -665,28 +662,28 @@ void m2Data::OnRenderSpectrumImages(double min, double max)
   Q_UNUSED(max);
 }
 
-void m2Data::UpdateTextAnnotations(std::string text)
+void m2Data::UpdateTextAnnotations(std::string /*text*/)
 {
-  static const std::array<std::string, 3> windownames = {"axial", "sagittal", "coronal"};
-  if (m_TextAnnotations.size() != 3)
-  {
-    m_TextAnnotations.clear();
-    for (int i = 0; i < 3; i++)
-    {
-      m_TextAnnotations.push_back(mitk::TextAnnotation2D::New());
-      auto renderer = GetRenderWindowPart()->GetQmitkRenderWindow(windownames[i].c_str())->GetRenderer();
-      mitk::LayoutAnnotationRenderer::AddAnnotation(m_TextAnnotations.back(), renderer);
-      m_TextAnnotations.back()->SetFontSize(15);
-      float color[] = {0.7, 0.7, 0.7};
-      m_TextAnnotations.back()->SetFontSize(20);
+  // static const std::array<std::string, 3> windownames = {"axial", "sagittal", "coronal"};
+  // if (m_TextAnnotations.size() != 3)
+  // {
+  //   m_TextAnnotations.clear();
+  //   for (int i = 0; i < 3; i++)
+  //   {
+  //     m_TextAnnotations.push_back(mitk::TextAnnotation2D::New());
+  //     auto renderer = GetRenderWindowPart()->GetQmitkRenderWindow(windownames[i].c_str())->GetRenderer();
+  //     mitk::LayoutAnnotationRenderer::AddAnnotation(m_TextAnnotations.back(), renderer);
+  //     m_TextAnnotations.back()->SetFontSize(15);
+  //     float color[] = {0.7, 0.7, 0.7};
+  //     m_TextAnnotations.back()->SetFontSize(20);
 
-      m_TextAnnotations.back()->SetColor(color);
-    }
-  }
-  for (auto anno : m_TextAnnotations)
-  {
-    anno->SetText(text);
-  }
+  //     m_TextAnnotations.back()->SetColor(color);
+  //   }
+  // }
+  // for (auto anno : m_TextAnnotations)
+  // {
+  //   anno->SetText(text);
+  // }
 }
 
 mitk::DataNode::Pointer m2Data::FindChildNodeRegex(mitk::DataNode::Pointer &parent, std::string regexString)
@@ -801,6 +798,7 @@ void m2Data::OpenSlideImageNodeAdded(const mitk::DataNode *node)
             auto node = mitk::DataNode::New();
             node->SetData(I);
             node->SetName(name + "_tile_" + std::to_string(k));
+            node->SetVisibility(k < 2, nullptr);
             this->GetDataStorage()->Add(node);
             ++k;
           }
@@ -815,6 +813,7 @@ void m2Data::OpenSlideImageNodeAdded(const mitk::DataNode *node)
             node->SetName(
               itksys::SystemTools::GetFilenameWithoutExtension(openSlideIOHelper->GetOpenSlideIO()->GetFileName()) +
               "_" + std::to_string(i++));
+            // node->SetVisibility(false, nullptr);
             this->GetDataStorage()->Add(node);
           }
         }
@@ -877,7 +876,7 @@ void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
     helperNode->SetName("MaskImage");
     helperNode->SetVisibility(m_Controls.showMaskImages->isChecked());
     helperNode->SetData(spectrumImage->GetMaskImage());
-    helperNode->SetStringProperty("spectrum.image.type", "mask");
+    helperNode->SetStringProperty("m2aia.helper.image.name", "MaskImage");
 
     // add hidden to DS
     helperNode->SetBoolProperty("helper object", true);
@@ -890,7 +889,8 @@ void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
     helperNode->SetName("IndexImage");
     helperNode->SetVisibility(m_Controls.showIndexImages->isChecked());
     helperNode->SetData(spectrumImage->GetIndexImage());
-    helperNode->SetStringProperty("spectrum.image.type", "index");
+    helperNode->SetStringProperty("m2aia.helper.image.name", "IndexImage");
+    helperNode->SetBoolProperty("binary", false);
     // add hidden to DS
     helperNode->SetBoolProperty("helper object", true);
     this->GetDataStorage()->Add(helperNode, const_cast<mitk::DataNode *>(node));
@@ -900,12 +900,10 @@ void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
     // -------------- add Normalization to datastorage --------------
     for (auto type : m2::NormalizationStrategyTypeList)
     {
-      if (type == m2::NormalizationStrategyType::None)
-        continue;
 
       helperNode = mitk::DataNode::New();
       helperNode->SetName("NormalizationImage" + m2::to_string(type));
-      helperNode->SetStringProperty("spectrum.image.type", ("normalization " + m2::to_string(type)).c_str());    
+            helperNode->SetBoolProperty("binary", false);
       
       // here we add only the template images
       // initialization is done by UI interaction
@@ -915,6 +913,9 @@ void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
       // add hidden to DS
       helperNode->SetBoolProperty("helper object", true);
       this->GetDataStorage()->Add(helperNode, const_cast<mitk::DataNode *>(node));
+      auto name = m2::NormalizationStrategyTypeNames.at(to_underlying(type))+ "Image";
+      helperNode->SetStringProperty("m2aia.helper.image.normalization.name", name.c_str());
+      helperNode->SetIntProperty("m2aia.helper.image.normalization.type", to_underlying(type));
 
       // clear the image data if not already initialized
       if(image && !spectrumImage->GetNormalizationImageStatus(type)){
@@ -922,8 +923,6 @@ void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
         mitk::ImagePixelWriteAccessor<m2::NormImagePixelType, 3> acc(image);
         std::memset(acc.GetData(), 0, imageSize[0] * imageSize[1] * imageSize[2] * sizeof(m2::NormImagePixelType));
       }
-      
-   
 
       // consideration of the check boxes
       auto checkBox = m_Controls.settings->findChild<QCheckBox *>(("ckBoxNormalizationImage" + m2::to_string(type)).c_str());
@@ -945,10 +944,10 @@ void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
       auto intervals = m2::IntervalVector::New();
       intervals->SetType(type);
       intervals->SetInfo(info);
-      intervals->SetProperty("spectrum.xaxis.count", mitk::IntProperty::New(xs.size()));
+      intervals->SetProperty("m2aia.helper.spectrum.xaxis.count", mitk::IntProperty::New(xs.size()));
 
       if (auto image = dynamic_cast<m2::SpectrumImage *>(node->GetData()))
-        intervals->SetProperty("spectrum.pixel.count", mitk::IntProperty::New(image->GetNumberOfValidPixels()));
+        intervals->SetProperty("m2aia.image.pixel.count", mitk::IntProperty::New(image->GetNumberOfValidPixels()));
 
       using namespace std;
       auto &i = intervals->GetIntervals();
