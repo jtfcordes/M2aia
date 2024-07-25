@@ -26,6 +26,7 @@ See LICENSE.txt for details.
 
 #include <QtWidgets/QRubberBand>
 #include <iostream>
+#include <QmitkChartWidget.h>
 
 namespace m2
 {

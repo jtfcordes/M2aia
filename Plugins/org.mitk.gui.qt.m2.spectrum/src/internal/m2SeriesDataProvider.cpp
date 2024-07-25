@@ -83,6 +83,8 @@ void m2::SeriesDataProvider::Update()
     m_xs = m_IntervalVector->GetXMean();
     m_ys = m_IntervalVector->GetYMean(); // Critical?
 
+    // m_IntervalVector->
+
     m_DataLoD.clear();
     if (m_Format == m2::SpectrumFormat::Centroid)
     {

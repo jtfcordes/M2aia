@@ -29,6 +29,9 @@ See LICENSE.txt for details.
 #include <QValueAxis>
 #include <QWidgetAction>
 #include <QXYSeries>
+#include <QComboBox>
+#include <QPushButton>
+#include <QFileDialog>
 
 // MITK includes
 #include <mitkColorProperty.h>
@@ -37,15 +40,16 @@ See LICENSE.txt for details.
 #include <mitkIPreferencesService.h>
 #include <mitkLookupTableProperty.h>
 #include <mitkStatusBar.h>
+#include <QmitkIOUtil.h>
 
 // M2aia includes
 #include <m2ImzMLSpectrumImage.h>
 #include <m2UIUtils.h>
+#include <m2SpectrumImage.h>
 #include <signal/m2PeakDetection.h>
 
 // internal includes
 #include "m2SeriesDataProvider.h"
-#include <m2SpectrumImage.h>
 
 const std::string m2Spectrum::VIEW_ID = "org.mitk.views.m2.spectrum";
 
@@ -119,6 +123,7 @@ void m2Spectrum::UpdateSelectedArea()
     m_Controls.chartView->repaint();
 
     bool showSamplingPoints = m_M2aiaPreferences->GetBool("m2aia.view.spectrum.showSamplingPoints", false);
+    
     if (showSamplingPoints)
     {
       using namespace std;
@@ -315,6 +320,9 @@ void m2Spectrum::NodeAdded(const mitk::DataNode *node)
 {
   if (!node)
     return;
+
+  MITK_INFO << "NodeAdded: " << node->GetName();
+
   m_Chart = m_Controls.chartView->chart();
 
   if (auto intervals = dynamic_cast<m2::IntervalVector *>(node->GetData()))
@@ -335,6 +343,8 @@ void m2Spectrum::NodeAdded(const mitk::DataNode *node)
     provider->Initialize(intervals);
     provider->GetSeries()->setName(node->GetName().c_str());
     provider->GetSeries()->setVisible(isVisible);
+ 
+
 
     m_DataProvider[node] = provider;
     m_NodeRelatedGraphicItems[node] = new QGraphicsItemGroup();
@@ -369,7 +379,7 @@ void m2Spectrum::NodeAdded(const mitk::DataNode *node)
     if (m_xAxis)
       m_xAxis->setRange(m_LocalMinimumX, m_LocalMaximumX);
     if (m_yAxis)
-      m_yAxis->setRange(m_LocalMinimumY * 0.9, m_LocalMaximumY * 1.1);
+      m_yAxis->setRange(m_LocalMinimumY, m_LocalMaximumY * 1.1);
     m_Controls.chartView->repaint();
 
     // MITK_INFO << "SpectrumView: " << node->GetName();
@@ -415,7 +425,7 @@ void m2Spectrum::OnMouseMove(
     }
   }
 
-  UpdateSelectedArea();
+  // UpdateSelectedArea();
 
   // MITK_INFO("m2Spectrum::OnMouseMove") << "Mouse Pressed";
 }
@@ -478,7 +488,7 @@ void m2Spectrum::OnMouseWheel(QPoint pos, qreal x, qreal y, int angle, Qt::Keybo
     return;
   }
 
-  const auto modifiedMin = m_yAxis->min() * 0.9;
+  const auto modifiedMin = m_yAxis->min();
   const auto modifiedMax = m_yAxis->max() * 1.1;
   bool bothAxes = ((y > modifiedMin) && (y < modifiedMax) && (x > m_xAxis->min()) && (x < m_xAxis->max()));
 
@@ -564,7 +574,7 @@ void m2Spectrum::UpdateGlobalMinMaxValues()
 
     const auto cmp = [](const auto &a, const auto &b) { return a.y() < b.y(); };
     const auto minmaxY = std::minmax_element(std::begin(points), std::end(points), cmp);
-    m_GlobalMinimumY = std::min(m_GlobalMinimumY, minmaxY.first->y());
+    m_GlobalMinimumY = std::min(std::max(0.0, m_GlobalMinimumY), std::max(0.0, minmaxY.first->y()));
     m_GlobalMaximumY = std::max(m_GlobalMaximumY, minmaxY.second->y());
   }
 
@@ -601,10 +611,48 @@ void m2Spectrum::CreateQtPartControl(QWidget *parent)
   CreateQChartView();
   CreateQChartViewMenu();
 
-  m_M2aiaPreferences =
-    mitk::CoreServices::GetPreferencesService()->GetSystemPreferences()->Node("/org.mitk.gui.qt.m2aia.preferences");
+	auto* preferencesService = mitk::CoreServices::GetPreferencesService();
+	m_M2aiaPreferences = preferencesService->GetSystemPreferences();
 
   m_Controls.chartView->chart()->legend()->setVisible(false);
+  
+  m_Controls.comboBox->addItem("BlueIcy", QtCharts::QChart::ChartThemeBlueIcy);
+  m_Controls.comboBox->addItem("BlueCerulean", QtCharts::QChart::ChartThemeBlueCerulean);
+  m_Controls.comboBox->addItem("BlueNcs", QtCharts::QChart::ChartThemeBlueNcs);
+  m_Controls.comboBox->addItem("BrownSand", QtCharts::QChart::ChartThemeBrownSand);
+  m_Controls.comboBox->addItem("Dark", QtCharts::QChart::ChartThemeDark);
+  m_Controls.comboBox->addItem("HighContrast", QtCharts::QChart::ChartThemeHighContrast);
+  m_Controls.comboBox->addItem("Light", QtCharts::QChart::ChartThemeLight);
+  m_Controls.comboBox->addItem("Qt", QtCharts::QChart::ChartThemeQt);
+
+  connect(m_Controls.comboBox,
+          qOverload<int>(&QComboBox::currentIndexChanged),
+          this,
+          [&](int i) { 
+            auto theme = static_cast<QtCharts::QChart::ChartTheme>(m_Controls.comboBox->itemData(i).toInt());
+            m_Chart->setTheme(theme);
+            
+           });
+
+  m_Controls.comboBox->setCurrentIndex(4);
+
+  connect(m_Controls.saveButton,
+          &QPushButton::clicked,
+          this,
+          [&]() { 
+            auto name = QFileDialog::getSaveFileName(m_Controls.chartView, tr("Save File"),
+                           "/home/jana/untitled.png",
+                           tr("Images (*.png *.xpm *.jpg)"));
+            auto r = m_Controls.chartView->rect();
+            r.setX(r.x() + 10);
+            r.setY(r.y() + 10);
+
+            r.setWidth(r.width() - 10);
+            r.setHeight(r.height() - 10);
+
+            m_Controls.chartView->grab(r).save(name);
+           });
+
 }
 
 void m2Spectrum::CreateQChartViewMenu()
@@ -716,17 +764,25 @@ void m2Spectrum::CreateQChartViewMenu()
 
   wActionY->setDefaultWidget(m_TickCountY);
 
+
+
+
+
   m_Menu->addAction(wActionXLabel);
   m_Menu->addAction(wActionX);
 
   m_Menu->addAction(wActionYLabel);
   m_Menu->addAction(wActionY);
 
+  
+
   m_Controls.chartView->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(m_Controls.chartView,
           &QtCharts::QChartView::customContextMenuRequested,
           this,
           [&](const QPoint &pos) { m_Menu->exec(m_Controls.chartView->viewport()->mapToGlobal(pos)); });
+
+
 }
 
 void m2Spectrum::CreateQChartView()
@@ -738,7 +794,7 @@ void m2Spectrum::CreateQChartView()
   chart->legend()->setAlignment(Qt::AlignRight);
   chart->legend()->setShowToolTips(true);
   chart->setAnimationOptions(QtCharts::QChart::NoAnimation);
-  chart->setTheme(QtCharts::QChart::ChartThemeDark);
+  chart->setTheme(QtCharts::QChart::ChartThemeBlueIcy);
 
   m_Crosshair = new QGraphicsSimpleTextItem("", chart);
   auto b = m_Crosshair->brush();
@@ -758,17 +814,19 @@ void m2Spectrum::AutoZoomUseLocalExtremaY()
   if (m_DataProvider.empty())
     return;
 
-  if (m_M2aiaPreferences->GetBool("m2aia.view.spectrum.useMaxIntensity", true) ||
-      m_M2aiaPreferences->GetBool("m2aia.view.spectrum.useMinIntensity", true))
+  bool useMaxIntensity =  m_M2aiaPreferences->GetBool("m2aia.view.spectrum.useMaxIntensity", true);
+  bool useMinIntensity = m_M2aiaPreferences->GetBool("m2aia.view.spectrum.useMinIntensity", true);
+
+  if ( useMaxIntensity || useMinIntensity)
   {
-    if (m_M2aiaPreferences->GetBool("m2aia.view.spectrum.useMaxIntensity", true))
+    if (useMaxIntensity)
     {
       m_yAxis->setMax(m_LocalMaximumY * 1.1);
     } // else use just current zoom, no adaptions.
 
-    if (m_M2aiaPreferences->GetBool("m2aia.view.spectrum.useMinIntensity", true))
+    if (useMinIntensity)
     {
-      m_yAxis->setMin(m_LocalMinimumY * 0.9);
+      m_yAxis->setMin(m_LocalMinimumY);
     }
     else
     {
@@ -816,8 +874,6 @@ void m2Spectrum::NodeRemoved(const mitk::DataNode *node)
     m_DataProvider.erase(node);
 
     // UpdateAxisLabels(node, true);
-  }
-
   if (m_DataProvider.empty())
   {
     if (m_xAxis)
@@ -826,8 +882,10 @@ void m2Spectrum::NodeRemoved(const mitk::DataNode *node)
     {
       m_yAxis->setRange(0, 1);
       m_yAxis->setLabelFormat("%.6f");
+      }
     }
   }
+
 
   // OnResetView();
 }
@@ -965,7 +1023,7 @@ void m2Spectrum::OnRangeChangedAxisY(qreal min, qreal max)
     m_yAxis->blockSignals(false);
   }
 
-  if (min < m_GlobalMinimumY * 0.9)
+  if (min < m_GlobalMinimumY)
   {
     m_yAxis->blockSignals(true);
     m_yAxis->setMin(m_GlobalMinimumY);
