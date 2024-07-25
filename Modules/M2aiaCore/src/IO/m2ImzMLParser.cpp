@@ -87,7 +87,7 @@ void m2::ImzMLParser::ReadImageMetaData(m2::ImzMLSpectrumImage::Pointer data)
   std::unordered_map<std::string, FunctionType> accession_map;
   std::unordered_map<std::string, FunctionType> context_map;
 
-  f.open((data->GetImzMLDataPath()), std::ios_base::binary);
+  f.open(data->GetImzMLDataPath(), std::ios_base::binary);
 
   std::map<std::string, unsigned> precisionDict = {{"32-bit float", sizeof(float)},
                                                    {"64-bit float", sizeof(double)},
@@ -673,6 +673,15 @@ void m2::ImzMLParser::ReadImageSpectrumMetaData(m2::ImzMLSpectrumImage::Pointer 
         MITK_WARN << "The max count of pixels y was adjusted from " << imzMLSizeY << " to " << newSizeY << "";
       if (imzMLSizeX != newSizeX)
         MITK_WARN << "The max count of pixels z was adjusted from " << imzMLSizeZ << " to " << newSizeZ << "";
+      
+      // std::ofstream ofs("/home/jtfc/m2aia_imzml_correction.txt");
+      // for(auto s : data->GetSpectra()){
+      //   ofs << s.index[0] << " " << s.index[1] << " " << s.index[2] << std::endl;
+      //   ofs << s.intLength << " " << s.intOffset << " " << s.mzLength << " " << s.mzOffset << std::endl;
+      //   ofs << s.world.x << " " << s.world.y << " " << s.world.z << std::endl;
+      //   ofs << "----------------" << std::endl;
+      //   ofs.flush();
+      // }
     }
   }
 }
