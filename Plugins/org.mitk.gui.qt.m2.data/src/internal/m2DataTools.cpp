@@ -39,7 +39,7 @@ void m2DataTools::CreateQtPartControl(QWidget *parent)
   {
     m_Controls.ReferenceLevelWindowSelection->SetDataStorage(GetDataStorage());
     m_Controls.ReferenceLevelWindowSelection->SetNodePredicate(
-      mitk::NodePredicateAnd::New(mitk::TNodePredicateDataType<m2::SpectrumImage>::New(),
+      mitk::NodePredicateAnd::New(mitk::TNodePredicateDataType<mitk::Image>::New(),
                                   mitk::NodePredicateNot::New(mitk::NodePredicateProperty::New("helper object"))));
     m_Controls.ReferenceLevelWindowSelection->SetSelectionIsOptional(true);
     m_Controls.ReferenceLevelWindowSelection->SetEmptyInfo(QString("Reference image selection"));
@@ -47,7 +47,7 @@ void m2DataTools::CreateQtPartControl(QWidget *parent)
 
     m_Controls.ReferenceSelectionForScaleBar->SetDataStorage(GetDataStorage());
     m_Controls.ReferenceSelectionForScaleBar->SetNodePredicate(
-      mitk::NodePredicateAnd::New(mitk::TNodePredicateDataType<m2::SpectrumImage>::New(),
+      mitk::NodePredicateAnd::New(mitk::TNodePredicateDataType<mitk::Image>::New(),
                                   mitk::NodePredicateNot::New(mitk::NodePredicateProperty::New("helper object"))));
     m_Controls.ReferenceSelectionForScaleBar->SetSelectionIsOptional(true);
     m_Controls.ReferenceSelectionForScaleBar->SetEmptyInfo(QString("Reference image selection"));
@@ -191,7 +191,9 @@ void m2DataTools::OnResetTiling()
 
 void m2DataTools::OnEqualizeLW()
 {
-  auto allNodes = m2::UIUtils::AllNodes(GetDataStorage());
+  
+  auto allNodes = GetDataStorage()->GetSubset(m_Controls.ReferenceLevelWindowSelection->GetNodePredicate());
+  // m2::UIUtils::AllNodes(GetDataStorage());
 
   if (auto node = this->m_Controls.ReferenceLevelWindowSelection->GetSelectedNode())
   {
@@ -214,8 +216,11 @@ void m2DataTools::OnApplyTiling()
   std::vector<mitk::DataNode::Pointer> nodes;
   auto allNode = GetDataStorage()->GetAll();
   for (auto node : *allNode)
-    if (auto image = dynamic_cast<m2::SpectrumImage *>(node->GetData()))
+    if (auto image = dynamic_cast<mitk::Image *>(node->GetData()))
     {
+      if(!node->IsVisible(nullptr))
+        continue;
+
       maxWidth = std::max(maxWidth, image->GetDimensions()[0]);
       maxHeight = std::max(maxHeight, image->GetDimensions()[1]);
       nodes.push_back(node);
@@ -234,22 +239,29 @@ void m2DataTools::OnApplyTiling()
   int i = 0;
   for (auto node : nodes)
   {
+    if(!node->IsVisible(nullptr))
+      continue;
     // SpectrumImage Nodes
     mitk::Point3D origin, prevOrigin;
-    if (m2::SpectrumImage *image = dynamic_cast<m2::SpectrumImage *>(node->GetData()))
+    if (auto image = dynamic_cast<mitk::Image *>(node->GetData()))
     {
       prevOrigin = image->GetGeometry()->GetOrigin();
       origin[0] = maxWidth * int(i % nodesInRow) * image->GetGeometry()->GetSpacing()[0];
       origin[1] = maxHeight * int(i / nodesInRow) * image->GetGeometry()->GetSpacing()[1];
       origin[2] = double(0.0);
       image->GetGeometry()->SetOrigin(origin);
-      std::vector<mitk::BaseData *> imageList{image->GetIndexImage(), image->GetMaskImage(), image->GetPoints()};
-      for (auto kv : image->GetNormalizationImages())
-        imageList.push_back(kv.second.image);
       
-      for (auto current : imageList)
-        if (current && current->GetGeometry())
-          current->GetGeometry()->SetOrigin(origin);
+      if(auto spectrumImage = dynamic_cast<m2::SpectrumImage *>(node->GetData())){
+        std::vector<mitk::BaseData *> imageList{spectrumImage->GetIndexImage(), spectrumImage->GetMaskImage(), spectrumImage->GetPoints()};
+        for (auto kv : spectrumImage->GetNormalizationImages())
+          imageList.push_back(kv.second.image);
+      
+        for (auto current : imageList)
+          if (current && current->GetGeometry())
+            current->GetGeometry()->SetOrigin(origin);
+      }
+      
+     
     }
     else
     {
@@ -307,7 +319,7 @@ void m2DataTools::UpdateColorBarAndRenderWindows()
 
 void m2DataTools::UpdateLevelWindow(const mitk::DataNode *node)
 {
-  if (auto msImageBase = dynamic_cast<m2::SpectrumImage *>(node->GetData()))
+  if (auto msImageBase = dynamic_cast<mitk::Image *>(node->GetData()))
   {
     mitk::LevelWindow lw;
     node->GetLevelWindow(lw);
