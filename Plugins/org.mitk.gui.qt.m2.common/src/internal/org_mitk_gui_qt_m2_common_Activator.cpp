@@ -68,7 +68,10 @@ void org_mitk_gui_qt_m2_common_Activator::start(ctkPluginContext *context)
   descriptorManager->AddDescriptor(new QmitkNodeDescriptor(
     tr("SpectrumImageStack"), QString(":/QmitkM2aiaCore/SpectrumImage_48.png"), spectrumImageStackDescriptorPredicate, this));
 
-  auto desc = descriptorManager->GetDescriptor("SpectrumImage");
+  auto desc = descriptorManager->GetDescriptor("Image");
+  desc->AddAction(new QmitkDataNodeConvertPixelTypeAction(), false);
+
+  desc = descriptorManager->GetDescriptor("SpectrumImage");
   desc->AddAction(new QmitkDataNodeConvertPixelTypeAction(), false);
   desc->AddAction(new QmitkDataNodePlotColorAction(), false);
   desc->AddAction(new QmitkDataNodeReimportImageAction(), false);
