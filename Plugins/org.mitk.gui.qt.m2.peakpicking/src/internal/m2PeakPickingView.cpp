@@ -368,17 +368,17 @@ void m2PeakPickingView::OnStartPeakBinning()
     auto targetData = dynamic_cast<m2::IntervalVector *>(targetNode->GetData());
     targetData->GetIntervals() = I;
 
-    if (auto prop = sourceData->GetProperty("spectrum.pixel.count"))
+    if (auto prop = sourceData->GetProperty("m2aia.image.pixel.count"))
     {
       auto numberOfValidPixels = dynamic_cast<mitk::IntProperty *>(prop.GetPointer())->GetValue();
-      targetData->SetProperty("spectrum.pixel.count", mitk::IntProperty::New(numberOfValidPixels));
+      targetData->SetProperty("m2aia.image.pixel.count", mitk::IntProperty::New(numberOfValidPixels));
     }
     else
     {
       MITK_WARN << "Number Source pixel is not given!";
     }
 
-    targetData->SetProperty("spectrum.xaxis.count", mitk::IntProperty::New(targetData->GetIntervals().size()));
+    targetData->SetProperty("m2aia.helper.spectrum.xaxis.count", mitk::IntProperty::New(targetData->GetIntervals().size()));
     targetNode->Modified();
 
     if (!targetNodeAlreadyInDataStorage)
@@ -448,8 +448,8 @@ void m2PeakPickingView::OnStartPeakPickingOverview()
     targetData->GetIntervals() = PeakPicking(xs, ys);
     auto image = dynamic_cast<m2::SpectrumImage *>(parentNode->GetData());
 
-    targetData->SetProperty("spectrum.pixel.count", mitk::IntProperty::New(image->GetNumberOfValidPixels()));
-    targetData->SetProperty("spectrum.xaxis.count", mitk::IntProperty::New(targetData->GetIntervals().size()));
+    targetData->SetProperty("m2aia.image.pixel.count", mitk::IntProperty::New(image->GetNumberOfValidPixels()));
+    targetData->SetProperty("m2aia.helper.spectrum.xaxis.count", mitk::IntProperty::New(targetData->GetIntervals().size()));
     targetNode->Modified();
 
     if (!targetNodeAlreadyInDataStorage)
@@ -535,7 +535,7 @@ void m2PeakPickingView::OnStartPeakPickingImage()
     copy_if(
       begin(I), end(I), back_inserter(newI), [frequency](const m2::Interval &in) { return in.x.count() > frequency; });
 
-    std::string targetNodeName = "Image Centeoids (" + imageNode->GetName() + ")";
+    std::string targetNodeName = "Image Centroids (" + imageNode->GetName() + ")";
     auto targetNode = GetDerivations(imageNode, targetNodeName);
     bool targetNodeAlreadyInDataStorage = targetNode;
     if (!targetNode)
@@ -544,8 +544,8 @@ void m2PeakPickingView::OnStartPeakPickingImage()
     auto targetData = dynamic_cast<m2::IntervalVector *>(targetNode->GetData());
     targetData->GetIntervals() = newI;
 
-    targetData->SetProperty("spectrum.pixel.count", mitk::IntProperty::New(image->GetNumberOfValidPixels()));
-    targetData->SetProperty("spectrum.xaxis.count", mitk::IntProperty::New(targetData->GetIntervals().size()));
+    targetData->SetProperty("m2aia.image.pixel.count", mitk::IntProperty::New(image->GetNumberOfValidPixels()));
+    targetData->SetProperty("m2aia.helper.spectrum.xaxis.count", mitk::IntProperty::New(targetData->GetIntervals().size()));
     targetNode->Modified();
 
     if (!targetNodeAlreadyInDataStorage)
@@ -581,7 +581,7 @@ void m2PeakPickingView::OnStartCombineLists()
                    });
     ++i;
 
-    if (auto prop = sourceData->GetProperty("spectrum.pixel.count"))
+    if (auto prop = sourceData->GetProperty("m2aia.image.pixel.count"))
     {
       numberOfValidPixels += dynamic_cast<mitk::IntProperty *>(prop.GetPointer())->GetValue();
     }
@@ -595,7 +595,7 @@ void m2PeakPickingView::OnStartCombineLists()
 
   if (!targetNodeAlreadyInDataStorage)
     GetDataStorage()->Add(targetNode);
-  targetData->SetProperty("spectrum.pixel.count", mitk::IntProperty::New(numberOfValidPixels));
-  targetData->SetProperty("spectrum.xaxis.count", mitk::IntProperty::New(targetData->GetIntervals().size()));
+  targetData->SetProperty("m2aia.image.pixel.count", mitk::IntProperty::New(numberOfValidPixels));
+  targetData->SetProperty("m2aia.helper.spectrum.xaxis.count", mitk::IntProperty::New(targetData->GetIntervals().size()));
   targetNode->Modified();
 }
