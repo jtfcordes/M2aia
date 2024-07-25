@@ -175,6 +175,8 @@ namespace m2
     /// @brief Transformations are applied if available using elastix transformix
     std::vector<std::string> m_Transformations;
 
+    mutable bool m_IsIonImageGenerated = true;
+
     ImzMLSpectrumImage();
     ~ImzMLSpectrumImage() override;
     using m2::SpectrumImage::InternalClone;

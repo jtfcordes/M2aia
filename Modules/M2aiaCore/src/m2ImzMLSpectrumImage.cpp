@@ -46,7 +46,10 @@ double m2::ImzMLSpectrumImage::GetXMax() const{
 void m2::ImzMLSpectrumImage::GetImage(double mz, double tol, const mitk::Image *mask, mitk::Image *img) const
 {
   try{
+    while(!m_IsIonImageGenerated);
+    m_IsIonImageGenerated = false;
     m_SpectrumImageSource->GetImagePrivate(mz, tol, mask, img);
+    m_IsIonImageGenerated = true;
     m_CurrentX = mz;
   }catch(std::exception & e){
     MITK_ERROR << "Ion image could not be generated! Queried range is [" << mz-tol << ", " <<mz+tol << "]\n" << e.what();
