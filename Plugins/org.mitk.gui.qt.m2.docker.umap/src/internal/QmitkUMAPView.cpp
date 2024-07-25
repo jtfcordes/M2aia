@@ -19,6 +19,7 @@ found in the LICENSE file.
 #include <mitkDockerHelper.h>
 #include <mitkNodePredicateFunction.h>
 #include <mitkProgressBar.h>
+#include <m2MassSpecVisualizationFilter.h>
 
 // Don't forget to initialize the VIEW_ID.
 const std::string QmitkUMAPView::VIEW_ID = "org.mitk.views.m2.docker.umap";
@@ -109,8 +110,13 @@ void QmitkUMAPView::OnStartDockerProcessing()
           auto image = dynamic_cast<mitk::Image *>(results[0].GetPointer());
           image->GetGeometry()->SetSpacing(refImage->GetGeometry()->GetSpacing());
           image->GetGeometry()->SetOrigin(refImage->GetGeometry()->GetOrigin());
+
+          auto cImage = m2::MassSpecVisualizationFilter::ConvertMitkVectorImageToRGB(image);
+          cImage->GetGeometry()->SetSpacing(refImage->GetGeometry()->GetSpacing());
+          cImage->GetGeometry()->SetOrigin(refImage->GetGeometry()->GetOrigin());
+
           auto newNode = mitk::DataNode::New();
-          newNode->SetData(image);
+          newNode->SetData(cImage);
           newNode->SetName(imageNode->GetName() + "_umap");
 
           GetDataStorage()->Add(newNode, const_cast<mitk::DataNode *>(imageNode.GetPointer()));
