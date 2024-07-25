@@ -61,6 +61,9 @@ void m2BrowserPreferencesPage::CreateQtControl(QWidget* parent)
 
 	m_Ui->useMaxIntensity->setChecked(m_Preferences->GetBool("m2aia.view.spectrum.useMaxIntensity", true));
     m_Ui->useMinIntensity->setChecked(m_Preferences->GetBool("m2aia.view.spectrum.useMinIntensity", true));
+	
+	// auto v = ;
+	// m_Preferences->PutBool("m2aia.view.spectrum.showSamplingPoints",v);
 	m_Ui->showSamplingPoints->setChecked(m_Preferences->GetBool("m2aia.view.spectrum.showSamplingPoints", false));
 	m_Ui->minimalImagingArea->setChecked(m_Preferences->GetBool("m2aia.view.image.minimal_area", true));
 
@@ -89,14 +92,8 @@ void m2BrowserPreferencesPage::CreateQtControl(QWidget* parent)
 	connect(m_Ui->useMaxIntensity, SIGNAL(toggled(bool)), this, SLOT(OnUseMaxIntensity(bool)));
 	connect(m_Ui->useMinIntensity, SIGNAL(toggled(bool)), this, SLOT(OnUseMinIntensity(bool)));
 	connect(m_Ui->minimalImagingArea, SIGNAL(toggled(bool)), this, SLOT(OnUseMinimalImagingArea(bool)));
+	connect(m_Ui->showSamplingPoints, SIGNAL(toggled(bool)), this, SLOT(OnUseSamplingPoints(bool)));
 
-	connect(m_Ui->showSamplingPoints, &QCheckBox::toggled, this, [this](bool v){
-		m_Ui->showSamplingPoints->setChecked(v);
-		m_Preferences->PutBool("m2aia.view.image.showSamplingPoints",v);
-
-	});
-
-	
 }
 
 
@@ -209,6 +206,11 @@ bool m2BrowserPreferencesPage::PerformOk()
 	m_Preferences->Put("m2aia.external.transformix", m_TransformixPath);
 	return true;
 }
+
+void m2BrowserPreferencesPage::OnUseSamplingPoints(bool v){
+	m_Preferences->PutBool("m2aia.view.spectrum.showSamplingPoints", v);
+}
+
 
 void m2BrowserPreferencesPage::OnUseMaxIntensity(bool v){
 	m_Preferences->PutBool("m2aia.view.spectrum.useMaxIntensity", v);
