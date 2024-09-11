@@ -11,23 +11,29 @@ found in the LICENSE file.
 ============================================================================*/
 #include "QmitkDataNodeExportComponentAction.h"
 
+#include <itkVectorIndexSelectionCastImageFilter.h>
+
 #include "mitkRenderingManager.h"
 #include <mitkImage.h>
 #include <mitkImageAccessByItk.h>
 #include <mitkImageReadAccessor.h>
 #include <mitkImageWriteAccessor.h>
-
+#include <mitkImageCast.h>
 // needed for qApp
 #include <qcoreapplication.h>
+#include <QWidget>
+#include <QAction>
 
 QmitkDataNodeExportComponentAction::QmitkDataNodeExportComponentAction(QWidget *parent, berry::IWorkbenchPartSite::Pointer workbenchPartSite)
-  : QAction(parent), QmitkAbstractDataNodeAction(berry::IWorkbenchPartSite::Pointer(workbenchPartSite))
+  : QAction(parent),
+    QmitkAbstractDataNodeAction(workbenchPartSite)
 {
   InitializeAction();
 }
 
 QmitkDataNodeExportComponentAction::QmitkDataNodeExportComponentAction(QWidget *parent, berry::IWorkbenchPartSite *workbenchPartSite)
-  : QAction(parent), QmitkAbstractDataNodeAction(berry::IWorkbenchPartSite::Pointer(workbenchPartSite))
+  : QAction(parent), 
+    QmitkAbstractDataNodeAction(workbenchPartSite)
 {
   InitializeAction();
 }
@@ -41,39 +47,46 @@ void QmitkDataNodeExportComponentAction::InitializeAction()
   connect(this, &QAction::triggered, this, &QmitkDataNodeExportComponentAction::OnActionTriggered);
 }
 
-mitk::Image::Pointer QmitkDataNodeExportComponentAction::ExportComponentImage(const mitk::Image *img,
+mitk::Image::Pointer QmitkDataNodeExportComponentAction::ExportComponentImage(mitk::Image *img,
                                                                               unsigned int component)
 {
   const auto inputPixelType = img->GetPixelType();
-  const auto nComponents = inputPixelType.GetNumberOfComponents();
-  const auto &sVector = inputPixelType.GetSize();
-  const auto sElement = sVector / nComponents;
-  const auto nPixels =
-    std::accumulate(img->GetDimensions(), img->GetDimensions() + img->GetDimension(), 1, std::multiplies<>());
-  const auto inGeometry = img->GetSlicedGeometry();
+  // const auto nComponents = inputPixelType.GetNumberOfComponents();
+  // const auto &sVector = inputPixelType.GetSize();
+  // const auto sElement = sVector / nComponents;
+  // const auto nPixels =
+  //   std::accumulate(img->GetDimensions(), img->GetDimensions() + img->GetDimension(), 1, std::multiplies<>());
+  // const auto inGeometry = img->GetGeometry();
 
-  auto output = mitk::Image::New();
+  mitk::Image::Pointer output;
   
   AccessVectorPixelTypeByItk(img, ([&](auto itkImage){
     using SourceImageType = typename std::remove_pointer<decltype(itkImage)>::type;
-    mitk::PixelType newPixelType = mitk::MakePixelType<SourceImageType>(1);
-    output->Initialize(newPixelType, 3, img->GetDimensions());
+    using ScalarImageType = itk::Image<typename SourceImageType::ValueType::ComponentType, SourceImageType::ImageDimension>;
+    using IndexSelectionType = itk::VectorIndexSelectionCastImageFilter<SourceImageType, ScalarImageType>;
+    auto indexSelectionFilter = IndexSelectionType::New();
+    indexSelectionFilter->SetIndex(component);
+    indexSelectionFilter->SetInput(itkImage);
+    indexSelectionFilter->Update();
+    mitk::CastToMitkImage(indexSelectionFilter->GetOutput(), output); 
   }));
 
   
   // auto newPixelType = mitk::MakePixelType(inputPixelType, 1);
-  output->GetSlicedGeometry()->SetSpacing(inGeometry->GetSpacing());
-  output->GetSlicedGeometry()->SetOrigin(inGeometry->GetOrigin());
-  output->GetSlicedGeometry()->SetDirectionVector(inGeometry->GetDirectionVector());
+  // output->GetGeometry()->SetSpacing(inGeometry->GetSpacing());
+  // output->GetGeometry()->SetOrigin(inGeometry->GetOrigin());
+  // output->GetGeometry()->SetIndexToWorldTransformWithoutChangingSpacing(inGeometry->GetIndexToWorldTransform());
 
-  mitk::ImageReadAccessor acc(img);
-  mitk::ImageWriteAccessor occ(output);
-  char *oData = (char *)occ.GetData();
-  for (char *iData = (char *)acc.GetData(); iData != (char *)acc.GetData() + (sVector * nPixels); iData += sVector)
-  {
-    std::copy(iData + (component * sElement), iData + ((component + 1) * sElement), oData);
-    oData += sElement;
-  }
+  
+
+  // mitk::ImageReadAccessor acc(img);
+  // mitk::ImageWriteAccessor occ(output);
+  // char *oData = (char *)occ.GetData();
+  // for (char *iData = (char *)acc.GetData(); iData != (char *)acc.GetData() + (sVector * nPixels); iData += sVector)
+  // {
+  //   std::copy(iData + (component * sElement), iData + ((component + 1) * sElement), oData);
+  //   oData += sElement;
+  // }
 
   return output;
 }

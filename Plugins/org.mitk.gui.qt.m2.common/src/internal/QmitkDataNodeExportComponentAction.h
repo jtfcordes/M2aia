@@ -25,7 +25,7 @@ public:
   QmitkDataNodeExportComponentAction(QWidget* parent, berry::IWorkbenchPartSite::Pointer workbenchPartSite);
   QmitkDataNodeExportComponentAction(QWidget* parent = nullptr, berry::IWorkbenchPartSite* workbenchPartSite = nullptr);
 
-  static mitk::Image::Pointer ExportComponentImage(const mitk::Image * img, unsigned int i);
+  static mitk::Image::Pointer ExportComponentImage(mitk::Image * img, unsigned int i);
 
 private Q_SLOTS:
 
