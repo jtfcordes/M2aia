@@ -61,7 +61,7 @@ found in the LICENSE file.
 #include <boost/algorithm/string.hpp>
 
 // Eigen
-#include "Eigen/Dense"
+// #include "Eigen/Dense"
 // OpenMP
 #include <omp.h>
 
@@ -287,15 +287,15 @@ void QmitkDataCompressionView::OnStartKMeans()
       
       auto clusteredImage = mitk::LabelSetImage::New();
       clusteredImage->Initialize(m);
-      clusteredImage->AddLayer(mitk::LabelSet::New());
-      auto labelset = clusteredImage->GetLabelSet(0);
+      // clusteredImage->GetActiveLabelSet();
+      // auto labelset = clusteredImage->GetActiveLabelSet();
       for(int i = 0; i < m_Controls.kmeans_clusters->value(); ++i){
         mitk::Label::Pointer label = mitk::Label::New();
         label->SetName("Cluster " + std::to_string(i));
         label->SetValue(i);
         label->SetOpacity(0.5);
         label->SetColor(m2::RandomColor());
-        labelset->AddLabel(label);
+        clusteredImage->AddLabel(label,0);
       }
       
       {

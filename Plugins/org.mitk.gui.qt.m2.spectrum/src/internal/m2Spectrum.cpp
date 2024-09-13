@@ -32,6 +32,7 @@ See LICENSE.txt for details.
 #include <QComboBox>
 #include <QPushButton>
 #include <QFileDialog>
+#include <QLineSeries>
 
 // MITK includes
 #include <mitkColorProperty.h>
@@ -63,7 +64,7 @@ void m2Spectrum::DrawSelectedArea()
   auto chart = m_Controls.chartView->chart();
   if (m_SelectedArea[1] == nullptr)
   {
-    m_SelectedArea[1] = new QtCharts::QLineSeries();
+    m_SelectedArea[1] = new QLineSeries();
     chart->addSeries(m_SelectedArea[1]);
     m_SelectedArea[1]->attachAxis(m_xAxis);
     m_SelectedArea[1]->attachAxis(m_yAxis);
@@ -80,7 +81,7 @@ void m2Spectrum::DrawSelectedArea()
     m_SelectedArea[1]->setPen(pen);
     m_SelectedArea[1]->setName("Selection");
 
-    m_SelectedArea[2] = new QtCharts::QLineSeries();
+    m_SelectedArea[2] = new QLineSeries();
     chart->addSeries(m_SelectedArea[2]);
     m_SelectedArea[2]->attachAxis(m_xAxis);
     m_SelectedArea[2]->attachAxis(m_yAxis);
@@ -91,7 +92,7 @@ void m2Spectrum::DrawSelectedArea()
 
     chart->legend()->markers(m_SelectedArea[2])[0]->setVisible(false);
 
-    m_SelectedArea[0] = new QtCharts::QLineSeries();
+    m_SelectedArea[0] = new QLineSeries();
     chart->addSeries(m_SelectedArea[0]);
 
     m_SelectedArea[0]->attachAxis(m_xAxis);
@@ -189,21 +190,21 @@ void m2Spectrum::UpdateSelectedArea()
   }
 }
 
-void m2Spectrum::OnMousePress(QPoint pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod)
+void m2Spectrum::OnMousePress(QPointF pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod)
 {
   Q_UNUSED(pos)
   if (mod & Qt::AltModifier && !m_RangeSelectionStarted)
   {
-    m_Controls.chartView->setRubberBand(QtCharts::QChartView::RubberBand::HorizontalRubberBand);
+    m_Controls.chartView->setRubberBand(QChartView::RubberBand::HorizontalRubberBand);
     m_SelectedAreaX[0] = mz;
     m_RangeSelectionStarted = true;
   }
 
-  if (button == Qt::MouseButton::MidButton)
+  if (button == Qt::MouseButton::MiddleButton)
   {
     auto c = m_Controls.chartView->chart();
-    const auto *xAx = dynamic_cast<QtCharts::QValueAxis *>(c->axes(Qt::Horizontal).front());
-    const auto *yAx = dynamic_cast<QtCharts::QValueAxis *>(c->axes(Qt::Vertical).front());
+    const auto *xAx = dynamic_cast<QValueAxis *>(c->axes(Qt::Horizontal).front());
+    const auto *yAx = dynamic_cast<QValueAxis *>(c->axes(Qt::Vertical).front());
     if (mz > xAx->min() && mz < xAx->max() && intValue > yAx->min() && intValue < yAx->max())
     {
       m_MouseDragCenterPos = mz;
@@ -321,7 +322,7 @@ void m2Spectrum::NodeAdded(const mitk::DataNode *node)
   if (!node)
     return;
 
-  MITK_INFO << "NodeAdded: " << node->GetName();
+  // MITK_INFO << "NodeAdded: " << node->GetName();
 
   m_Chart = m_Controls.chartView->chart();
 
@@ -352,8 +353,8 @@ void m2Spectrum::NodeAdded(const mitk::DataNode *node)
     m_Chart->addSeries(provider->GetSeries());
 
     m_Chart->createDefaultAxes();
-    m_xAxis = static_cast<QtCharts::QValueAxis *>(m_Chart->axes(Qt::Horizontal).front());
-    m_yAxis = static_cast<QtCharts::QValueAxis *>(m_Chart->axes(Qt::Vertical).front());
+    m_xAxis = static_cast<QValueAxis *>(m_Chart->axes(Qt::Horizontal).front());
+    m_yAxis = static_cast<QValueAxis *>(m_Chart->axes(Qt::Vertical).front());
     QObject::connect(m_xAxis, SIGNAL(rangeChanged(qreal, qreal)), this, SLOT(OnRangeChangedAxisX(qreal, qreal)));
     QObject::connect(m_yAxis, SIGNAL(rangeChanged(qreal, qreal)), this, SLOT(OnRangeChangedAxisY(qreal, qreal)));
 
@@ -392,7 +393,7 @@ void m2Spectrum::NodeAdded(const mitk::DataNode *node)
 }
 
 void m2Spectrum::OnMouseMove(
-  QPoint pos, qreal mz, qreal intValue, Qt::MouseButton /*button*/, Qt::KeyboardModifiers /*mod*/)
+  QPointF pos, qreal mz, qreal intValue, Qt::MouseButton /*button*/, Qt::KeyboardModifiers /*mod*/)
 {
   const auto chart = m_Controls.chartView->chart();
   const auto chartPos = chart->mapToPosition(QPoint(mz, intValue));
@@ -430,7 +431,7 @@ void m2Spectrum::OnMouseMove(
   // MITK_INFO("m2Spectrum::OnMouseMove") << "Mouse Pressed";
 }
 
-void m2Spectrum::OnMouseRelease(QPoint pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod)
+void m2Spectrum::OnMouseRelease(QPointF pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod)
 {
   Q_UNUSED(pos)
   Q_UNUSED(intValue)
@@ -440,7 +441,7 @@ void m2Spectrum::OnMouseRelease(QPoint pos, qreal mz, qreal intValue, Qt::MouseB
   }
   if (m_RangeSelectionStarted)
   {
-    m_Controls.chartView->setRubberBand(QtCharts::QChartView::RubberBand::NoRubberBand);
+    m_Controls.chartView->setRubberBand(QChartView::RubberBand::NoRubberBand);
     DrawSelectedArea();
     const auto mz = (m_SelectedAreaX[1] + m_SelectedAreaX[0]) * 0.5;
     const auto tol = std::abs(m_SelectedAreaX[1] - m_SelectedAreaX[0]) * 0.5;
@@ -448,16 +449,16 @@ void m2Spectrum::OnMouseRelease(QPoint pos, qreal mz, qreal intValue, Qt::MouseB
     emit m2::UIUtils::Instance()->UpdateImage(mz, tol);
   }
   m_RangeSelectionStarted = false;
-  m_Controls.chartView->setRubberBand(QtCharts::QChartView::RubberBand::NoRubberBand);
+  m_Controls.chartView->setRubberBand(QChartView::RubberBand::NoRubberBand);
 
-  if (button == Qt::MouseButton::MidButton)
+  if (button == Qt::MouseButton::MiddleButton)
   {
     m_DraggingActive = false;
   }
 }
 
 void m2Spectrum::OnMouseDoubleClick(
-  QPoint pos, qreal xVal, qreal yVal, Qt::MouseButton /*button*/, Qt::KeyboardModifiers /*mod*/)
+  QPointF pos, qreal xVal, qreal yVal, Qt::MouseButton /*button*/, Qt::KeyboardModifiers /*mod*/)
 {
   Q_UNUSED(pos)
 
@@ -479,7 +480,7 @@ void m2Spectrum::OnMouseDoubleClick(
   }
 }
 
-void m2Spectrum::OnMouseWheel(QPoint pos, qreal x, qreal y, int angle, Qt::KeyboardModifiers mod)
+void m2Spectrum::OnMouseWheel(QPointF pos, qreal x, qreal y, int angle, Qt::KeyboardModifiers mod)
 {
   Q_UNUSED(pos)
 
@@ -616,20 +617,49 @@ void m2Spectrum::CreateQtPartControl(QWidget *parent)
 
   m_Controls.chartView->chart()->legend()->setVisible(false);
   
-  m_Controls.comboBox->addItem("BlueIcy", QtCharts::QChart::ChartThemeBlueIcy);
-  m_Controls.comboBox->addItem("BlueCerulean", QtCharts::QChart::ChartThemeBlueCerulean);
-  m_Controls.comboBox->addItem("BlueNcs", QtCharts::QChart::ChartThemeBlueNcs);
-  m_Controls.comboBox->addItem("BrownSand", QtCharts::QChart::ChartThemeBrownSand);
-  m_Controls.comboBox->addItem("Dark", QtCharts::QChart::ChartThemeDark);
-  m_Controls.comboBox->addItem("HighContrast", QtCharts::QChart::ChartThemeHighContrast);
-  m_Controls.comboBox->addItem("Light", QtCharts::QChart::ChartThemeLight);
-  m_Controls.comboBox->addItem("Qt", QtCharts::QChart::ChartThemeQt);
+  m_Controls.comboBox->addItem("BlueIcy", QChart::ChartThemeBlueIcy);
+  m_Controls.comboBox->addItem("BlueCerulean", QChart::ChartThemeBlueCerulean);
+  m_Controls.comboBox->addItem("BlueNcs", QChart::ChartThemeBlueNcs);
+  m_Controls.comboBox->addItem("BrownSand", QChart::ChartThemeBrownSand);
+  m_Controls.comboBox->addItem("Dark", QChart::ChartThemeDark);
+  m_Controls.comboBox->addItem("HighContrast", QChart::ChartThemeHighContrast);
+  m_Controls.comboBox->addItem("Light", QChart::ChartThemeLight);
+  m_Controls.comboBox->addItem("Qt", QChart::ChartThemeQt);
+  
+
+
+  connect(m_Controls.comboBox,
+          qOverload<int>(&QComboBox::highlighted),
+          this,
+          [&](int i) { 
+            auto theme = static_cast<QChart::ChartTheme>(m_Controls.comboBox->itemData(i).toInt());          
+
+            if(!m_Chart->series().empty()){
+              QPen pen;
+              if(auto xySeriesPre = dynamic_cast<QXYSeries*>(m_Chart->series().front())){
+                pen = xySeriesPre->pen();
+                MITK_INFO << xySeriesPre->pen().widthF();
+              }
+              
+              m_Chart->setTheme(theme);
+
+              foreach(QAbstractSeries * series, m_Chart->series()){
+                if(auto xySeriesPost = dynamic_cast<QXYSeries *>(series)){
+                  auto pen =  xySeriesPost->pen();
+                  pen.setWidthF(0.75);
+                  xySeriesPost->setPen(pen);
+                }
+              }
+            }
+            
+           });
+
 
   connect(m_Controls.comboBox,
           qOverload<int>(&QComboBox::currentIndexChanged),
           this,
           [&](int i) { 
-            auto theme = static_cast<QtCharts::QChart::ChartTheme>(m_Controls.comboBox->itemData(i).toInt());
+            auto theme = static_cast<QChart::ChartTheme>(m_Controls.comboBox->itemData(i).toInt());
             m_Chart->setTheme(theme);
             
            });
@@ -778,7 +808,7 @@ void m2Spectrum::CreateQChartViewMenu()
 
   m_Controls.chartView->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(m_Controls.chartView,
-          &QtCharts::QChartView::customContextMenuRequested,
+          &QChartView::customContextMenuRequested,
           this,
           [&](const QPoint &pos) { m_Menu->exec(m_Controls.chartView->viewport()->mapToGlobal(pos)); });
 
@@ -787,14 +817,14 @@ void m2Spectrum::CreateQChartViewMenu()
 
 void m2Spectrum::CreateQChartView()
 {
-  auto chart = new QtCharts::QChart();
+  auto chart = new QChart();
   m_Controls.chartView->setChart(chart);
   m_Chart = chart;
 
   chart->legend()->setAlignment(Qt::AlignRight);
   chart->legend()->setShowToolTips(true);
-  chart->setAnimationOptions(QtCharts::QChart::NoAnimation);
-  chart->setTheme(QtCharts::QChart::ChartThemeBlueIcy);
+  chart->setAnimationOptions(QChart::NoAnimation);
+  chart->setTheme(QChart::ChartThemeBlueIcy);
 
   m_Crosshair = new QGraphicsSimpleTextItem("", chart);
   auto b = m_Crosshair->brush();
@@ -890,10 +920,10 @@ void m2Spectrum::NodeRemoved(const mitk::DataNode *node)
   // OnResetView();
 }
 
-void m2Spectrum::SetSeriesVisible(QtCharts::QAbstractSeries *series, bool visibility)
+void m2Spectrum::SetSeriesVisible(QAbstractSeries *series, bool visibility)
 {
   auto markers = m_Chart->legend()->markers();
-  std::vector<QtCharts::QLegendMarker *> series_marker;
+  std::vector<QLegendMarker *> series_marker;
   for (auto marker : markers)
   {
     if (marker->series() == series)
@@ -933,7 +963,7 @@ void m2Spectrum::SetSeriesVisible(QtCharts::QAbstractSeries *series, bool visibi
 
 void m2Spectrum::OnLegnedHandleMarkerClicked()
 {
-  auto *marker = qobject_cast<QtCharts::QLegendMarker *>(sender());
+  auto *marker = qobject_cast<QLegendMarker *>(sender());
   Q_ASSERT(marker);
   SetSeriesVisible(marker->series(), !marker->series()->isVisible());
 }

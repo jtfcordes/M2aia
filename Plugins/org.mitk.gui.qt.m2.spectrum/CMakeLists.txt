@@ -4,5 +4,5 @@ mitk_create_plugin(
   EXPORT_DIRECTIVE M2_SPECTRUM_EXPORT
   EXPORTED_INCLUDE_SUFFIXES src
   MODULE_DEPENDS MitkQtWidgetsExt M2aiaCore
-  PACKAGE_DEPENDS Qt5|Charts Boost
+  PACKAGE_DEPENDS Qt6|Charts Boost
 )

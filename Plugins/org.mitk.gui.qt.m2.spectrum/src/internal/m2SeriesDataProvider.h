@@ -54,12 +54,12 @@ namespace m2
     void SetColor(qreal r, qreal g, qreal b, qreal a);
     void SetColor(QColor c);
     
-    QtCharts::QXYSeries * GetSeries() const{return m_Series;}
+    QXYSeries * GetSeries() const{return m_Series;}
   private:
     /**
      * Qt Series for providing XY data for the QtChartsView
      */
-    QtCharts::QXYSeries *m_Series;
+    QXYSeries *m_Series;
 
     /**
      * 
@@ -69,7 +69,7 @@ namespace m2
     /**
      * This series is used to add line information to scatter plots
     */
-    QtCharts::QXYSeries *m_SeriesHelper;
+    QXYSeries *m_SeriesHelper;
 
     /**
      * Data degeneration levels.
@@ -107,9 +107,9 @@ namespace m2
 
 
 
-    static void SetProfileSpectrumDefaultStyle(QtCharts::QXYSeries *series);
-    static void SetCentroidSpectrumDefaultMarkerStyle(QtCharts::QXYSeries *series);
-    static void SetMarkerSpectrumDefaultMarkerStyle(QtCharts::QXYSeries *series);
+    static void SetProfileSpectrumDefaultStyle(QXYSeries *series);
+    static void SetCentroidSpectrumDefaultMarkerStyle(QXYSeries *series);
+    static void SetMarkerSpectrumDefaultMarkerStyle(QXYSeries *series);
     static PointsVector GenerateLoDData(std::vector<double> & xs, std::vector<double> & ys, unsigned int value);
 
     /**

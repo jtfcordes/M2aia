@@ -21,22 +21,22 @@ See LICENSE.txt for details.
 #include <QLineSeries>
 #include <QObject>
 #include <QScatterSeries>
-#include <QtCharts/QChartView>
-#include <QtCharts/QChart>
+#include <QChartView>
+#include <QChart>
 
 #include <QtWidgets/QRubberBand>
 #include <iostream>
-#include <QmitkChartWidget.h>
+// #include <QmitkChartWidget.h>
 
 namespace m2
 {
-  class ChartView : public QtCharts::QChartView
+  class ChartView : public QChartView
   {
     Q_OBJECT
 
   public:
     ChartView(QWidget *parent = 0);
-    ChartView(QtCharts::QChart *chart, QWidget *parent = 0);
+    ChartView(QChart *chart, QWidget *parent = 0);
     //void OnResize();
 //    int GetTickCountX() { return m_AxisXTicks; }
 
@@ -44,11 +44,11 @@ namespace m2
 
   
   signals:
-    void mousePress(QPoint pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers);
-    void mouseMove(QPoint pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers);
-    void mouseRelease(QPoint pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers);
-    void mouseDoubleClick(QPoint pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers);
-    void mouseWheel(QPoint pos, qreal mz, qreal intValue, int angle, Qt::KeyboardModifiers);
+    void mousePress(QPointF pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers);
+    void mouseMove(QPointF pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers);
+    void mouseRelease(QPointF pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers);
+    void mouseDoubleClick(QPointF pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers);
+    void mouseWheel(QPointF pos, qreal mz, qreal intValue, int angle, Qt::KeyboardModifiers);
 
   protected:
 

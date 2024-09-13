@@ -73,9 +73,6 @@
        <height>0.000000000000000</height>
       </rectf>
      </property>
-     <property name="renderHints">
-      <set>QPainter::Antialiasing|QPainter::HighQualityAntialiasing|QPainter::NonCosmeticDefaultPen|QPainter::TextAntialiasing</set>
-     </property>
      <property name="dragMode">
       <enum>QGraphicsView::NoDrag</enum>
      </property>

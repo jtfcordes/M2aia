@@ -31,16 +31,16 @@ See LICENSE.txt or https://www.github.com/jtfcordes/m2aia for details.
 #include <qscatterseries.h>
 #include <qslider.h>
 #include <QFutureWatcher>
+#include <QValueAxis>
+#include <QLineSeries>
+
 
 
 class QMenu;
 class QActionGroup;
 class QGraphicsItem;
 class QGraphicsSimpleTextItem;
-namespace QtCharts
-{
-  class QValueAxis;
-}
+
 namespace itk{
   template<class T>
   class NodeMemberCommand : public itk::MemberCommand<T>{
@@ -96,7 +96,7 @@ protected:
   
   std::array<unsigned int,2> m_AxisTicks = {9,4};
   std::array<double, 2> m_SelectedAreaX = {0,0};
-  std::array<QtCharts::QLineSeries *, 3> m_SelectedArea = {nullptr,nullptr,nullptr};
+  std::array<QLineSeries *, 3> m_SelectedArea = {nullptr,nullptr,nullptr};
 
    std::map<const mitk::DataNode *, QGraphicsItemGroup *> m_NodeRelatedGraphicItems;
   std::map<const mitk::DataNode *, std::vector<unsigned int>> m_NodeObserverTags;
@@ -110,7 +110,7 @@ protected:
   void UpdateTitles(const mitk::DataNode *);
   void UpdateZoomLevel(const mitk::DataNode *);
   void UpdateSelectedArea();
-  void SetSeriesVisible(QtCharts::QAbstractSeries * series, bool visibility);
+  void SetSeriesVisible(QAbstractSeries * series, bool visibility);
 
 protected slots:
   void OnMassRangeChanged(qreal x, qreal tol);
@@ -122,11 +122,11 @@ protected slots:
   void OnAxisYTicksChanged(int v);
   // void OnSpectrumArtifactChanged(const mitk::DataNode *, m2::SpectrumType);
 
-  void OnMousePress(QPoint pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod);
-  void OnMouseMove(QPoint pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod);
-  void OnMouseRelease(QPoint pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod);
-  void OnMouseDoubleClick(QPoint pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod);
-  void OnMouseWheel(QPoint pos, qreal mz, qreal intValue, int angle, Qt::KeyboardModifiers mod);  
+  void OnMousePress(QPointF pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod);
+  void OnMouseMove(QPointF pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod);
+  void OnMouseRelease(QPointF pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod);
+  void OnMouseDoubleClick(QPointF pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod);
+  void OnMouseWheel(QPointF pos, qreal mz, qreal intValue, int angle, Qt::KeyboardModifiers mod);  
 
   void OnRangeChangedAxisX(qreal min, qreal max);
   void OnRangeChangedAxisY(qreal min, qreal max);
@@ -147,7 +147,7 @@ protected:
   
   
 
-  QtCharts::QChart *m_Chart = nullptr;
+  QChart *m_Chart = nullptr;
   
   bool m_BlockAutoScaling = false;
   
@@ -180,8 +180,8 @@ private:
   QMenu *m_FocusMenu;
   QSlider *m_TickCountX;
   QSlider *m_TickCountY;
-  QtCharts::QValueAxis *m_xAxis;
-  QtCharts::QValueAxis *m_yAxis;
+  QValueAxis *m_xAxis;
+  QValueAxis *m_yAxis;
 
   QVector<QString> m_xAxisTitels;
 

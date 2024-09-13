@@ -64,13 +64,13 @@ void m2::SeriesDataProvider::InitializeSeries()
 {
   if (m_Format == m2::SpectrumFormat::Centroid)
   {
-    m_Series = new QtCharts::QLineSeries();
+    m_Series = new QLineSeries();
     SetProfileSpectrumDefaultStyle(m_Series);
     m_Series->setPointsVisible(true);
   }
   else if (m_Format == m2::SpectrumFormat::Profile)
   {
-    m_Series = new QtCharts::QLineSeries();
+    m_Series = new QLineSeries();
     SetProfileSpectrumDefaultStyle(m_Series);
     m_Series->setPointsVisible(false);
   }
@@ -173,9 +173,6 @@ void m2::SeriesDataProvider::UpdateBoundaries(double x1, double x2)
       }
     }
     m_Series->replace(seriesData);
-
-    using namespace QtCharts;
-    // process series after points were added
   }
 }
 
@@ -203,7 +200,7 @@ m2::SeriesDataProvider::PointsVector m2::SeriesDataProvider::GenerateLoDData(std
   return target;
 }
 
-void m2::SeriesDataProvider::SetProfileSpectrumDefaultStyle(QtCharts::QXYSeries *series)
+void m2::SeriesDataProvider::SetProfileSpectrumDefaultStyle(QXYSeries *series)
 {
   auto p = series->pen();
   p.setWidthF(.75);
@@ -211,20 +208,20 @@ void m2::SeriesDataProvider::SetProfileSpectrumDefaultStyle(QtCharts::QXYSeries 
   series->setPen(p);
 }
 
-void m2::SeriesDataProvider::SetCentroidSpectrumDefaultMarkerStyle(QtCharts::QXYSeries *series)
+void m2::SeriesDataProvider::SetCentroidSpectrumDefaultMarkerStyle(QXYSeries *series)
 {
-  if (auto scatterSeries = dynamic_cast<QtCharts::QScatterSeries *>(series))
+  if (auto scatterSeries = dynamic_cast<QScatterSeries *>(series))
   {
-    scatterSeries->setMarkerShape(QtCharts::QScatterSeries::MarkerShape::MarkerShapeRectangle);
+    scatterSeries->setMarkerShape(QScatterSeries::MarkerShape::MarkerShapeRectangle);
     scatterSeries->setMarkerSize(3);
   }
 }
 
-void m2::SeriesDataProvider::SetMarkerSpectrumDefaultMarkerStyle(QtCharts::QXYSeries *series)
+void m2::SeriesDataProvider::SetMarkerSpectrumDefaultMarkerStyle(QXYSeries *series)
 {
-  if (auto scatterSeries = dynamic_cast<QtCharts::QScatterSeries *>(series))
+  if (auto scatterSeries = dynamic_cast<QScatterSeries *>(series))
   {
-    scatterSeries->setMarkerShape(QtCharts::QScatterSeries::MarkerShape::MarkerShapeCircle);
+    scatterSeries->setMarkerShape(QScatterSeries::MarkerShape::MarkerShapeCircle);
     scatterSeries->setMarkerSize(3);
     scatterSeries->setColor(Qt::GlobalColor::red);
   }
