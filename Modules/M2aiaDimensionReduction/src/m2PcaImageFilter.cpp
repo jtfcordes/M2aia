@@ -16,7 +16,7 @@
 #include <mitkImagePixelReadAccessor.h>
 #include <numeric> // std::iota
 #include <vnl/vnl_matrix.h>
-#include <boost/progress.hpp>
+// #include <boost/progress.hpp>
 
 void m2::PcaImageFilter::initMatrix()
 {
@@ -31,7 +31,7 @@ void m2::PcaImageFilter::initMatrix()
 
   this->m_DataMatrix.resize(numberOfrow, numberOfcolumn);
   unsigned int c = 0;
-  boost::progress_display p(numberOfcolumn);
+  // boost::progress_display p(numberOfcolumn);
   
   /*Fill matrix with image values one column includes values of one image*/
   for (auto it = input.begin(); it != input.end(); ++it, ++c)
@@ -39,7 +39,7 @@ void m2::PcaImageFilter::initMatrix()
     mitkImage = dynamic_cast<mitk::Image *>(it->GetPointer());
     mitk::ImagePixelReadAccessor<m2::DisplayImagePixelType, 3> access(mitkImage);
     std::copy(access.GetData(), access.GetData() + pixels, m_DataMatrix.col(c).data());
-    ++p;
+    // ++p;
   }
 
   // auto maxCoeffs = m_DataMatrix.colwise().maxCoeff();

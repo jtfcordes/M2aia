@@ -162,7 +162,7 @@ void m2::FsmSpectrumImage::InitializeGeometry()
     SetMaskImage(image.GetPointer());
 
     image->Initialize((mitk::Image *)this);
-    auto ls = image->GetActiveLabelSet();
+    
 
     mitk::Color color;
     color.Set(0, 1, 0);
@@ -172,7 +172,7 @@ void m2::FsmSpectrumImage::InitializeGeometry()
     label->SetOpacity(0.0);
     label->SetLocked(true);
     label->SetValue(1);
-    ls->AddLabel(label);
+    image->AddLabel(label,0);
   }
 
   mitk::ImagePixelWriteAccessor<m2::DisplayImagePixelType, 3> acc(this);

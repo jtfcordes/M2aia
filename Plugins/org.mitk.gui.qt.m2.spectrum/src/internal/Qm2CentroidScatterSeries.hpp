@@ -1,13 +1,11 @@
 #pragma once
 
-#include <QtCharts/QChart>
-#include <QtCharts/QChartView>
-#include <QtCharts/QScatterSeries>
+#include <QChart>
+#include <QChartView>
+#include <QScatterSeries>
 #include <QtGui/QPainter>
 #include <QtWidgets/QGraphicsItem>
-#include <QtCharts/QValueAxis>
-
-QT_CHARTS_USE_NAMESPACE
+#include <QValueAxis>
 
 class Qm2CentroidMarker : public QGraphicsItem
 {
