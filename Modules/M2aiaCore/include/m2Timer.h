@@ -17,7 +17,6 @@ See LICENSE.txt for details.
 
 #include <chrono>
 #include <iostream>
-#include <mbilog.h>
 #include <string>
 #include <functional>
 #include <mitkCommon.h>
