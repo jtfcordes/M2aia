@@ -302,7 +302,7 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
   if (mask)
     maskAccess.reset(new mitk::ImagePixelReadAccessor<mitk::LabelSetImage::PixelType, 3>(mask));
 
-  MITK_INFO << "Use Mask " << mask;
+  // MITK_INFO << "Use Mask " << mask;
 
   if (!destImage)
     mitkThrow() << "Please provide an image where the data should be written to.";
@@ -430,7 +430,6 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
             imageAccess.SetPixelByIndex(spectrum.index, 0);
             continue;
           }
-          
 
           mzs.resize(spectrum.mzLength);
           binaryDataToVector(
@@ -521,11 +520,11 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeGeomet
     std::memset(acc.GetData(), 0, imageSize[0] * imageSize[1] * imageSize[2] * sizeof(m2::IndexImagePixelType));
   }
 
-  {
+  if(p->GetMaskImage().IsNull()){
     auto image = mitk::LabelSetImage::New();
+    image->SetProperty("m2aia.mask.initialization", mitk::StringProperty::New("internal"));
     p->SetMaskImage(image.GetPointer());
     image->Initialize((mitk::Image *)p);
-    auto ls = image->GetActiveLabelSet();
 
     mitk::Color color;
     color.Set(0.0, 1, 0.0);
@@ -535,7 +534,10 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeGeomet
     label->SetOpacity(0.0);
     label->SetLocked(true);
     label->SetValue(1);
-    ls->AddLabel(label);
+    image->AddLabel(label,0);
+  }else{
+    auto image = p->GetMaskImage();
+    image->SetProperty("m2aia.mask.initialization", mitk::StringProperty::New("external"));
   }
 
   auto max_dim0 = p->GetDimensions()[0];
@@ -583,6 +585,15 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
 
   //////////---------------------------
   const auto spectrumType = p->GetSpectrumType();
+  const auto currentType = p->GetNormalizationStrategy();
+  if (p->GetNormalizationImageStatus(currentType) == false)
+  {
+    MITK_INFO << "First access to the normalization image: "
+              << m2::NormalizationStrategyTypeNames.at((unsigned int)currentType);
+    p->InitializeNormalizationImage(currentType);
+    p->SetNormalizationImageStatus(currentType, true);
+  }
+
 
   if (spectrumType.Format == m2::SpectrumFormat::ProcessedProfile)
   {
@@ -602,7 +613,12 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
 
   // DEFAULT
   // INITIALIZE MASK, INDEX, NORMALIZATION IMAGES
-  auto accMask = std::make_shared<mitk::ImagePixelWriteAccessor<mitk::LabelSetImage::PixelType, 3>>(p->GetMaskImage());
+  std::shared_ptr<mitk::ImagePixelWriteAccessor<mitk::LabelSetImage::PixelType, 3>> accMask;
+  
+  auto prop = p->GetMaskImage()->GetProperty("m2aia.mask.initialization");
+  if(prop && prop->GetValueAsString() == "internal"){
+    accMask =  std::make_shared<mitk::ImagePixelWriteAccessor<mitk::LabelSetImage::PixelType, 3>>(p->GetMaskImage());
+  }
   auto accIndex = std::make_shared<mitk::ImagePixelWriteAccessor<m2::IndexImagePixelType, 3>>(p->GetIndexImage());
   auto accNorm = std::make_shared<mitk::ImagePixelWriteAccessor<m2::NormImagePixelType, 3>>(p->GetNormalizationImage());
 
@@ -616,7 +632,9 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
                        const auto &spectrum = spectra[i];
 
                        accIndex->SetPixelByIndex(spectrum.index, i);
-                       accMask->SetPixelByIndex(spectrum.index, 1);
+                       
+                       if(accMask) 
+                        accMask->SetPixelByIndex(spectrum.index, 1);
 
                        // If it is a processed file, normalization maps are set to 1 - assuming that spectra were
                        // already processed if (any(importMode & (m2::SpectrumFormatType::ProcessedCentroid |
@@ -666,13 +684,7 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
   const auto currentType = p->GetNormalizationStrategy();
   {
     auto &spectra = p->GetSpectra();
-    if (p->GetNormalizationImageStatus(currentType) == false)
-    {
-      MITK_INFO << "First access to the normalization image: "
-                << m2::NormalizationStrategyTypeNames.at((unsigned int)currentType);
-      p->InitializeNormalizationImage(currentType);
-      p->SetNormalizationImageStatus(currentType, true);
-    }
+
     NormImageReadAccess accNorm(p->GetNormalizationImage(currentType));
 
     m2::Process::Map(
@@ -774,17 +786,16 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
                      f.open(p->GetBinaryDataPath(), std::ios::binary);
 
                      std::vector<IntensityType> ints;
-                     auto iO = spectra[0].intOffset;
-                     auto iL = spectra[0].intLength;
-                     ints.resize(iL);
 
                      for (unsigned i = a; i < b; i++)
                      {
-                       auto &spectrum = spectra[i];
-                       iO = spectrum.intOffset;
+                       auto iO = spectra[i].intOffset;
+                       auto iL = spectra[i].intLength;
+                       ints.resize(iL);
+                       
                        binaryDataToVector(f, iO, iL, ints.data());
 
-                       auto nFac = accNorm.GetPixelByIndex(spectrum.index);
+                       auto nFac = accNorm.GetPixelByIndex(spectra[i].index);
                        std::transform(
                          std::begin(ints), std::end(ints), std::begin(ints), [&nFac](auto &v) { return v / nFac; });
 
@@ -818,7 +829,7 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
   {
     skyline.push_back(peak.y.max());
     sum.push_back(peak.y.sum());
-    mean.push_back(peak.y.mean());
+    mean.push_back(peak.y.mean());    
   }
 }
 
@@ -843,7 +854,6 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
   using NormImageReadAccess = mitk::ImagePixelReadAccessor<NormImagePixelType, 3>;
   NormImageReadAccess accNorm(p->GetNormalizationImage(currentType));
 
-
   std::vector<std::list<m2::Interval>> peaksT(p->GetNumberOfThreads());
 
   int binsN;
@@ -867,8 +877,6 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
   std::vector<std::vector<unsigned int>> hT(T, std::vector<unsigned int>(binsN, 0));
   std::vector<std::vector<double>> xT(T, std::vector<double>(binsN, 0));
 
-
-
   // Find min max x values
   m2::Process::Map(spectra.size(),
                    T,
@@ -876,7 +884,7 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
                    {
                      std::ifstream f(p->GetBinaryDataPath(), std::ios::binary);
                      std::vector<MassAxisType> mzs;
-                    //  std::list<m2::Interval> peaks, tempList;
+                     //  std::list<m2::Interval> peaks, tempList;
                      // find x min/max
                      for (unsigned i = a; i < b; i++)
                      {
@@ -901,8 +909,6 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
   MITK_INFO << binsN << " " << min << " " << max << " " << binSize;
   MITK_INFO << spectra.size();
 
-
-
   m2::Process::Map(spectra.size(),
                    T,
                    [&](unsigned int t, unsigned int a, unsigned int b)
@@ -925,10 +931,10 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
                        binaryDataToVector(f, intO, intL, ints.data());
 
                        // Normalization
-                       if(p->GetNormalizationStrategy() != m2::NormalizationStrategyType::None)
+                       if (p->GetNormalizationStrategy() != m2::NormalizationStrategyType::None)
                        {
-                        double nFac = accNorm.GetPixelByIndex(spectrum.index);
-                        std::transform(
+                         double nFac = accNorm.GetPixelByIndex(spectrum.index);
+                         std::transform(
                            std::begin(ints), std::end(ints), std::begin(ints), [&nFac](auto &v) { return v / nFac; });
                        }
 
@@ -981,11 +987,9 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
   mean.clear();
   skyline.clear();
 
-  
-
   for (int k = 0; k < binsN; ++k)
   {
-    if (hT[0][k] > (spectra.size() * (minHits/100.0)))
+    if (hT[0][k] > (spectra.size() * (minHits / 100.0)))
     {
       mzAxis.push_back(xT[0][k] / (double)hT[0][k]);
       sum.push_back(yT[0][k]);
