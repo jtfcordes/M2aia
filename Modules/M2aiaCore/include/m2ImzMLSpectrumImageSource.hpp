@@ -43,6 +43,116 @@ See LICENSE.txt for details.
 #include <signal/m2Transformer.h>
 namespace m2
 {
+
+  template <typename InputIterator, typename AccumulateType, typename BinaryOperation, typename Predicate>
+  const AccumulateType accumulate_if(InputIterator first,
+                                    const InputIterator last,
+                                    AccumulateType init,
+                                    BinaryOperation &&binary_op,
+                                    Predicate &&predicate)
+  {
+    for (; first != last; ++first)
+      if (predicate(*first))
+        init = binary_op(init, *first);
+    return init;
+  }
+
+  template <typename InputIterator, typename OutputIterator, typename UnaryOperation, typename Predicate>
+  OutputIterator transform_if(
+    InputIterator first, InputIterator last, OutputIterator dest_first, UnaryOperation unary_op, Predicate predicate)
+  {
+    for (; first != last; ++first, ++dest_first)
+    {
+      if (predicate(*first))
+        *dest_first = unary_op(*first);
+    }
+    return dest_first;
+  }
+
+  template <typename InputIterator, typename Predicate>
+  auto minmax_if(InputIterator first, InputIterator last, Predicate predicate)
+  {
+      using ValueType = typename std::iterator_traits<InputIterator>::value_type;
+      bool found_any = false;
+      ValueType min_value{}, max_value{};
+
+      for (; first != last; ++first)
+      {
+          if (predicate(*first))
+          {
+              auto value = *first;
+              if (!found_any)
+              {
+                  min_value = max_value = value;
+                  found_any = true;
+              }
+              else
+              {
+                  if (value < min_value) min_value = value;
+                  if (value > max_value) max_value = value;
+              }
+          }
+      }
+
+      if (!found_any)
+          throw std::runtime_error("No elements satisfying predicate");
+
+      return std::make_pair(min_value, max_value);
+  }
+
+
+
+  template <typename InputIterator, typename MaskIterator, typename OutputIterator>
+  void StandardizeImage(InputIterator first,
+                                  InputIterator last,
+                                  MaskIterator first_mask,
+                                  OutputIterator dest_first)
+  {
+    auto maskIt = first_mask;
+    double N = accumulate_if(
+      first, last, 0, [](auto s, auto) -> int { return s + 1; }, [&maskIt](auto) { return *maskIt++ > 0; });
+
+    double sum = accumulate_if(first, last, 0.0, std::plus<>(), [&maskIt](auto) { return *maskIt++ > 0; });
+    auto mean = sum / N;
+
+    // reset mask iterator
+    maskIt = first_mask;
+    sum = accumulate_if(
+      first,
+      last,
+      0.0,
+      [mean](auto s, auto val) { return s + std::pow(val - mean, 2); },
+      [&maskIt](auto) { return *maskIt++ > 0; });
+    auto stddev = std::sqrt(sum / N);
+
+    // reset mask iterator
+    maskIt = first_mask;
+    transform_if(
+      first,
+      last,
+      dest_first,
+      [mean, stddev](auto val) { return (val - mean) / stddev; },
+      [&maskIt](auto) { return *maskIt++ > 0; });
+  
+  }
+
+
+  template <typename InputIterator, typename MaskIterator, typename OutputIterator>
+  void MinMaxNormalizeImage(InputIterator first,
+                            InputIterator last,
+                            MaskIterator first_mask,
+                            OutputIterator dest_first)
+  {
+    auto maskIt = first_mask;
+    const auto minMax = minmax_if(first, last, [&maskIt](auto) { return *maskIt++ > 0; });
+    const auto minVal = minMax.first;
+    const auto maxVal = minMax.second;
+
+    maskIt = first_mask;
+    transform_if(first, last, dest_first, [minVal, maxVal](auto val){return (val-minVal)/(maxVal-minVal);}, [&maskIt](auto) { return *maskIt++ > 0; });
+
+  }
+
   struct BinaryDataAccessHelper
   {
     unsigned dataOffset;
@@ -470,7 +580,17 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
         }
       });
   }
+
+ // normalize ion image post generation
+  const auto bufferN = std::accumulate(destImage->GetDimensions(), destImage->GetDimensions() + 3, 1, std::multiplies<>());
+  if(p->GetImageNormalizationStrategy() == m2::ImageNormalizationStrategyType::zScore)
+    StandardizeImage(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), imageAccess.GetData());
+  else if(p->GetImageNormalizationStrategy() == m2::ImageNormalizationStrategyType::MinMax)
+    MinMaxNormalizeImage(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), imageAccess.GetData());
+ 
 }
+
+
 
 template <class MassAxisType, class IntensityType>
 void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeGeometry()

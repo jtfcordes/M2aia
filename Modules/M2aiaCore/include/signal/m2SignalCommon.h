@@ -69,6 +69,23 @@ namespace m2
   const std::array<std::string, 8> NormalizationStrategyTypeNames = {
     "None", "TIC", "Sum", "Mean", "Max", "RMS", "Internal", "External"};
 
+
+  enum class ImageNormalizationStrategyType : unsigned int
+  {
+    None = 0, MinMax, zScore
+  };
+
+
+  const std::array<ImageNormalizationStrategyType, 3> ImageNormalizationStrategyTypeList = {
+    ImageNormalizationStrategyType::None,
+    ImageNormalizationStrategyType::MinMax,
+    ImageNormalizationStrategyType::zScore
+  };
+
+
+  const std::array<std::string, 3> ImageNormalizationStrategyTypeNames = {
+    "None", "MinMax", "zScore"};
+
   inline std::string to_string(m2::NormalizationStrategyType type){
     return NormalizationStrategyTypeNames.at(to_underlying(type));
   }
@@ -113,7 +130,9 @@ namespace m2
 
   const std::map<const std::string, unsigned int> NORMALIZATION_MAPPINGS{
      {"None", 0}, {"TIC", 1}, {"Sum", 2}, {"Mean", 3}, {"Max",4}, {"RMS",5}, {"Internal",6}, {"External", 7}};
-    
+
+  const std::map<const std::string, unsigned int> IMAGENORMALIZATION_MAPPINGS{
+     {"None", 0}, {"MinMax", 1}, {"zScore", 2}};
 
   const std::map<const std::string, unsigned int> POOLING_MAPPINGS{
     {"None", 0}, {"Mean", 1}, {"Median", 2}, {"Maximum", 3}, {"Sum", 4}};

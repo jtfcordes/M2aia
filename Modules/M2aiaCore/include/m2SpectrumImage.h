@@ -61,6 +61,9 @@ namespace m2
     itkSetEnumMacro(NormalizationStrategy, NormalizationStrategyType);
     itkGetEnumMacro(NormalizationStrategy, NormalizationStrategyType);
 
+    itkSetEnumMacro(ImageNormalizationStrategy, ImageNormalizationStrategyType);
+    itkGetEnumMacro(ImageNormalizationStrategy, ImageNormalizationStrategyType);
+
     itkSetEnumMacro(IntensityTransformationStrategy, IntensityTransformationType);
     itkGetEnumMacro(IntensityTransformationStrategy, IntensityTransformationType);
 
@@ -252,6 +255,8 @@ namespace m2
 
     NormalizationStrategyType m_NormalizationStrategy = NormalizationStrategyType::TIC;
     RangePoolingStrategyType m_RangePoolingStrategy = RangePoolingStrategyType::Sum;
+
+    ImageNormalizationStrategyType m_ImageNormalizationStrategy = ImageNormalizationStrategyType::None;
 
     SpectrumImage();
     ~SpectrumImage() override;

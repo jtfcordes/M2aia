@@ -530,7 +530,7 @@
            <number>4</number>
           </property>
           <property name="minimum">
-           <double>0.000000000000001</double>
+           <double>0.000000000000000</double>
           </property>
           <property name="maximum">
            <double>10000000000000.000000000000000</double>
@@ -628,6 +628,53 @@
        </layout>
       </item>
       <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_10">
+        <item>
+         <widget class="QLabel" name="label_15">
+          <property name="minimumSize">
+           <size>
+            <width>150</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>150</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="font">
+           <font>
+            <italic>false</italic>
+           </font>
+          </property>
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Values in a range based query are processed/pooled according to the selected strategy.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string>Normalization</string>
+          </property>
+          <property name="indent">
+           <number>0</number>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="CBImageNormalization">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="toolTip">
+           <string>Pool values in range, while using this method.</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
        <widget class="QCommandLinkButton" name="btnCreateImage">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
@@ -710,6 +757,32 @@
        </widget>
       </item>
       <item>
+       <widget class="QCheckBox" name="visibleOnInitialization">
+        <property name="text">
+         <string>Visible on initialization</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+        <property name="tristate">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="showCentroidSpectrum">
+        <property name="text">
+         <string>Show centroid spectrum node</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+        <property name="tristate">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QCheckBox" name="showMeanSpectrum">
         <property name="text">
          <string>Show mean spectrum node (profile spectra )</string>
@@ -733,12 +806,9 @@
        </widget>
       </item>
       <item>
-       <widget class="QCheckBox" name="showCentroidSpectrum">
+       <widget class="QCheckBox" name="showSingleSpectrum">
         <property name="text">
-         <string>Show centroid spectrum node</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
+         <string>Show single spectrum node</string>
         </property>
         <property name="tristate">
          <bool>false</bool>

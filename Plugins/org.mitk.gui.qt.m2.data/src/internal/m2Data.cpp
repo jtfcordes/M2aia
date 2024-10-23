@@ -31,7 +31,9 @@ See LICENSE.txt for details.
 #include <m2IntervalVector.h>
 #include <m2SpectrumImage.h>
 #include <m2SpectrumImageDataInteractor.h>
+#include <m2Process.hpp>
 #include <m2SpectrumImageStack.h>
+#include <m2ShiftMapImageFilter.h>
 #include <m2SubdivideImage2DFilter.h>
 #include <m2UIUtils.h>
 #include <mitkColorProperty.h>
@@ -63,6 +65,7 @@ void m2Data::CreateQtPartControl(QWidget *parent)
   InitRangePoolingControls();
   InitSmoothingControls();
   InitIntensityTransformationControls();
+  InitImageNormalizationControls();
 
   auto serviceRef = m2::UIUtils::Instance();
   connect(serviceRef, SIGNAL(UpdateImage(qreal, qreal)), this, SLOT(OnGenerateImageData(qreal, qreal)));
@@ -79,6 +82,9 @@ void m2Data::CreateQtPartControl(QWidget *parent)
   connect(UIUtilsObject, SIGNAL(NextImage()), this, SLOT(OnCreateNextImage()));
   connect(UIUtilsObject, SIGNAL(IncreaseTolerance()), this, SLOT(OnIncreaseTolerance()));
   connect(UIUtilsObject, SIGNAL(DecreaseTolerance()), this, SLOT(OnDecreaseTolerance()));
+
+  connect(m_Controls.btnCreateShiftMap, SIGNAL(clicked()), this, SLOT(OnCreateShiftMap()));
+  
 
   // Settings (show hlper objects)
   using namespace mitk;
@@ -248,17 +254,31 @@ void m2Data::CreateQtPartControl(QWidget *parent)
             auto value = m_Controls.CBSmoothing->currentData().toUInt();
             preferences->PutInt("m2aia.signal.SmoothingStrategy", value);
           });
+  connect(m_Controls.CBImageNormalization,
+          qOverload<int>(&QComboBox::currentIndexChanged),
+          this,
+          [this, preferences](int)
+          {
+            auto value = m_Controls.CBImageNormalization->currentData().toUInt();
+            preferences->PutInt("m2aia.signal.ImageNormalizationStrategy", value);
+          });
 
   // default values
   m_Controls.spnBxTol->setValue(preferences->GetFloat("m2aia.signal.Tolerance", 75));
+  
   m_Controls.CBNormalization->setCurrentIndex(
     preferences->GetInt("m2aia.signal.NormalizationStrategy", to_underlying(m2::NormalizationStrategyType::None)));
+  
   m_Controls.CBTransformation->setCurrentIndex(preferences->GetInt("m2aia.signal.IntensityTransformationStrategy",
                                                                    to_underlying(m2::NormalizationStrategyType::None)));
   m_Controls.CBSmoothing->setCurrentIndex(
     preferences->GetInt("m2aia.signal.SmoothingStrategy", to_underlying(m2::NormalizationStrategyType::None)));
+  
   m_Controls.CBImagingStrategy->setCurrentIndex(
     preferences->GetInt("m2aia.signal.RangePoolingStrategy", to_underlying(m2::NormalizationStrategyType::Mean)));
+  
+  m_Controls.CBImageNormalization->setCurrentIndex(
+    preferences->GetInt("m2aia.signal.ImageNormalizationStrategy", to_underlying(m2::ImageNormalizationStrategyType::None)));
 
   // Make sure, that data nodes added before this view
   // is initialized are handled correctly!!
@@ -338,6 +358,28 @@ m2::NormalizationStrategyType m2Data::GuiToNormalizationStrategyType()
     preferences->GetInt("m2aia.signal.NormalizationStrategy", to_underlying(m2::NormalizationStrategyType::None));
   return static_cast<m2::NormalizationStrategyType>(value);
 }
+
+void m2Data::InitImageNormalizationControls(){
+  auto *preferencesService = mitk::CoreServices::GetPreferencesService();
+  auto *preferences = preferencesService->GetSystemPreferences();
+  auto defaultValue =
+    preferences->GetInt("m2aia.signal.ImageNormalizationStrategy", to_underlying(m2::ImageNormalizationStrategyType::None));
+  auto cb = Controls()->CBImageNormalization;
+  for (unsigned int i = 0; i < m2::ImageNormalizationStrategyTypeNames.size(); ++i)
+    cb->addItem(m2::ImageNormalizationStrategyTypeNames[i].c_str(), {i});
+  cb->setCurrentIndex(defaultValue);
+}
+
+
+m2::ImageNormalizationStrategyType m2Data::GuiToImageNormalizationStrategyType()
+{
+  auto *preferencesService = mitk::CoreServices::GetPreferencesService();
+  auto *preferences = preferencesService->GetSystemPreferences();
+  auto value =
+    preferences->GetInt("m2aia.signal.ImageNormalizationStrategy", to_underlying(m2::ImageNormalizationStrategyType::None));
+  return static_cast<m2::ImageNormalizationStrategyType>(value);
+}
+
 
 void m2Data::InitIntensityTransformationControls()
 {
@@ -500,6 +542,7 @@ void m2Data::ApplySettingsToImage(m2::SpectrumImage *data)
     data->SetBaselineCorrectionStrategy(GuiToBaselineCorrectionStrategyType());
     data->SetSmoothingStrategy(GuiToSmoothingStrategyType());
     data->SetRangePoolingStrategy(GuiToRangePoolingStrategyType());
+    data->SetImageNormalizationStrategy(GuiToImageNormalizationStrategyType());
     data->SetIntensityTransformationStrategy(GuiToIntensityTransformationStrategyType());
 
     data->SetSmoothingHalfWindowSize(m_Controls.spnBxSmoothing->value());
@@ -532,10 +575,12 @@ void m2Data::OnGenerateImageData(mitk::DataNode::Pointer node,
   {
     auto xMin = data->GetPropertyValue<double>("m2aia.xs.min");
     auto xMax = data->GetPropertyValue<double>("m2aia.xs.max");
-    if (xRangeCenter > xMax || xRangeCenter < xMin)
-      return
+    if (xRangeCenter > xMax || xRangeCenter < xMin){
+      mitk::ImagePixelWriteAccessor<m2::DisplayImagePixelType, 3> acc(data);
+      return;
+    }
 
-        ApplySettingsToImage(data);
+    ApplySettingsToImage(data);
     if (!data->IsInitialized())
       mitkThrow() << "Trying to grab an ion image but data access was not initialized properly!";
 
@@ -763,8 +808,15 @@ void m2Data::UpdateLevelWindow(const mitk::DataNode *node)
     mitk::LevelWindow lw;
     node->GetLevelWindow(lw);
     lw.SetAuto(msImageBase);
-    const auto max = lw.GetRangeMax();
-    lw.SetWindowBounds(0, max);
+    switch(msImageBase->GetImageNormalizationStrategy()){
+      case m2::ImageNormalizationStrategyType::MinMax:
+      case m2::ImageNormalizationStrategyType::None:
+        lw.SetWindowBounds(0,lw.GetRangeMax());
+        break;
+      case m2::ImageNormalizationStrategyType::zScore:
+        lw.SetWindowBounds(-1,3);
+        break;
+    }
     const_cast<mitk::DataNode *>(node)->SetLevelWindow(lw);
   }
 }
@@ -1003,10 +1055,10 @@ void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
       using namespace std;
       auto &i = intervals->GetIntervals();
       transform(begin(xs), end(xs), begin(ys), back_inserter(i), [](auto &a, auto &b) { return m2::Interval(a, b); });
-      intervalsNode->SetData(intervals);
 
+      intervalsNode->SetData(intervals);
       intervalsNode->SetName(name);
-      intervalsNode->SetVisibility(checkState);
+      intervalsNode->SetVisibility(this->Controls()->visibleOnInitialization);
       intervalsNode->SetBoolProperty("helper object", !checkState);
       m2::CopyNodeProperties(node, intervalsNode);
       if ((unsigned int)(type) & (unsigned int)(m2::SpectrumFormat::Centroid))
