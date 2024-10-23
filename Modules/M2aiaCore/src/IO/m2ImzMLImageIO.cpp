@@ -13,7 +13,7 @@ A PARTICULAR PURPOSE.
 See LICENSE.txt or https://www.github.com/jtfcordes/m2aia for details.
 
 ===================================================================*/
-
+#define BOOST_TIMER_ENABLE_DEPRECATED
 #include <Poco/SHA1Engine.h>
 #include <boost/progress.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -611,6 +611,9 @@ namespace m2
     
     auto formatType = formatTypeProp ? formatTypeProp->GetValueAsString() : "";
     auto spectrumType = spectrumTypeProp ? spectrumTypeProp->GetValueAsString() : "";
+
+    MITK_WARN << "formatType: " << formatTypeProp << formatType;
+    MITK_WARN << "spectrumType: " << spectrumTypeProp << spectrumType;
     bool isProcessedSpectrum = formatType == "processed";
     bool isContinuousSpectrum = formatType == "continuous";
     bool isProfileSpectrum = spectrumType == "profile spectrum";
@@ -674,13 +677,23 @@ namespace m2
 
   void ImzMLImageIO::LoadAssociatedData(m2::ImzMLSpectrumImage *object)
   {
-
     auto pathWithoutExtension = RemoveExtensionFromPath(GetInputLocation());   
+
     auto maskPath = pathWithoutExtension + ".mask.nrrd";
+    MITK_INFO << maskPath;
     if (itksys::SystemTools::FileExists(maskPath))
     {
       auto data = mitk::IOUtil::Load(maskPath).at(0);
       object->SetMaskImage(dynamic_cast<mitk::Image *>(data.GetPointer()));
+    }
+
+    
+    auto shiftImagePath = pathWithoutExtension + ".index_shift.nrrd";
+    MITK_INFO << shiftImagePath;
+    if (itksys::SystemTools::FileExists(shiftImagePath))
+    {
+      auto data = mitk::IOUtil::Load(shiftImagePath).at(0);
+      object->SetShiftImage(dynamic_cast<mitk::Image *>(data.GetPointer()));
     }
 
     auto normPath = pathWithoutExtension + ".norm.nrrd";
@@ -712,3 +725,6 @@ namespace m2
     return new ImzMLImageIO(*this);
   }
 } // namespace m2
+
+
+#undef BOOST_TIMER_ENABLE_DEPRECATED
