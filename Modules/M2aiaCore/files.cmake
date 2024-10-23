@@ -15,6 +15,7 @@ set(H_FILES
   # include/m2ElxUtil.h
   # include/m2ElxRegistrationHelper.h
   include/m2SubdivideImage2DFilter.h
+  include/m2ShiftMapImageFilter.h
   
   include/npy/npy.hpp
   
@@ -56,6 +57,7 @@ set(CPP_FILES
   m2SubdivideImage2DFilter.cpp
   m2SpectrumImageDataInteractor.cpp
   m2IntervalVector.cpp
+m2ShiftMapImageFilter.cpp
   
   IO/m2ImzMLParser.cpp
   IO/m2ImzMLImageIO.cpp

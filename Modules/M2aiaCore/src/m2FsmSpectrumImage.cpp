@@ -58,7 +58,7 @@ void m2::FsmSpectrumImage::GetImage(double cmInv, double tol, const mitk::Image 
   const auto subRes = m2::Signal::Subrange(xs, cmInv - tol, cmInv + tol);
   const unsigned long n = m_Spectra.size();
   // map all spectra to several threads for processing
-  const unsigned int t = GetNumberOfThreads();
+  const unsigned int t = m2::SpectrumImage::GetNumberOfThreads();
   
 
   m2::Process::Map(n,

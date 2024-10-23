@@ -746,26 +746,23 @@
        </widget>
       </item>
       <item>
-       <widget class="Line" name="line_5">
+       <widget class="Line" name="line">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="label_5">
+       <widget class="QLabel" name="label_6">
         <property name="text">
-         <string>Interactive Spectra</string>
+         <string>Maps</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QCheckBox" name="showSingleSpectrum">
+       <widget class="QCommandLinkButton" name="btnCreateShiftMap">
         <property name="text">
-         <string>Show single spectrum node</string>
-        </property>
-        <property name="tristate">
-         <bool>false</bool>
+         <string>m/z shift (selected range)</string>
         </property>
        </widget>
       </item>

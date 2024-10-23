@@ -87,8 +87,15 @@ namespace m2
     itkSetMacro(UseToleranceInPPM, bool);
     itkGetConstReferenceMacro(UseToleranceInPPM, bool);
 
-    itkGetConstReferenceMacro(NumberOfThreads, unsigned int);
-    itkSetMacro(NumberOfThreads, unsigned int);
+    unsigned int GetNumberOfThreads() const
+    {
+      unsigned int max_threads = std::thread::hardware_concurrency();
+      if (max_threads == 0)
+      {
+        return m_NumberOfThreads; // Fallback in case hardware_concurrency() returns 0
+      }
+      return max_threads;
+    }
 
     itkGetConstReferenceMacro(NumberOfValidPixels, unsigned int);
     itkSetMacro(NumberOfValidPixels, unsigned int);
@@ -102,6 +109,11 @@ namespace m2
     itkGetMacro(MaskImage, mitk::Image::Pointer);
     itkGetConstMacro(MaskImage, mitk::Image::Pointer);
     itkSetMacro(MaskImage, mitk::Image::Pointer);
+
+    itkGetMacro(ShiftImage, mitk::Image::Pointer);
+    itkGetConstMacro(ShiftImage, mitk::Image::Pointer);
+    itkSetMacro(ShiftImage, mitk::Image::Pointer);
+
 
     itkGetMacro(IndexImage, mitk::Image::Pointer);
     itkGetConstMacro(IndexImage, mitk::Image::Pointer);
@@ -162,20 +174,18 @@ namespace m2
 
     /// @brief This method is called after the Processor and the Geometry is initalized.
     // Initializes all necessary data required for raw data access to image data.
-    // This method can be used to delegate calls to the previously initialized processor object (m2::InitializeProcessor)
-    // This method may access the initialized image structures (m2::InitializeGeometry)
+    // This method can be used to delegate calls to the previously initialized processor object
+    // (m2::InitializeProcessor) This method may access the initialized image structures (m2::InitializeGeometry)
     // Initialize images: 
     // - all kind of normalization images (TIC, RMS, ..)
     // - the index image (mapping of imzML spectrum indices in the image domain - e.g used for image queries)
-    // - the image mask (Background: 0 - pixel with no/invalid spectral data, Foreground: 1 - pixels with valid spectral data)
-    // Initialize spectra: 
+    // - the image mask (Background: 0 - pixel with no/invalid spectral data, Foreground: 1 - pixels with valid spectral
+    // data) Initialize spectra:
     // - overview spectra (e.g. mean, skyline/maximum)
     virtual void InitializeImageAccess() = 0;
 
     /// @brief This method is called during the InitializeImageAccess call.
-    virtual void InitializeNormalizationImage(m2::NormalizationStrategyType /*type*/) =0;
-
-
+    virtual void InitializeNormalizationImage(m2::NormalizationStrategyType /*type*/) = 0;
 
     // void InsertImageArtifact(const std::string &key, mitk::Image *img);
 
@@ -228,6 +238,7 @@ namespace m2
     SpectrumArtifactMapType m_SpectraArtifacts;   
     
     mitk::Image::Pointer m_MaskImage;
+    mitk::Image::Pointer m_ShiftImage;
     mitk::Image::Pointer m_IndexImage;
     mitk::PointSet::Pointer m_Points;
     NormalizationImageMapType m_NormalizationImages;

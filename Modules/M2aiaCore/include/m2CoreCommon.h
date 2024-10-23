@@ -178,6 +178,7 @@ namespace m2
   using NormImagePixelType = double;
   using IndexType = unsigned int;
   using WorldCoordinateType = float;
+  using ShiftImageType = int;
   using IndexImagePixelType = IndexType;
 
   enum class TransformationMethod

@@ -587,6 +587,40 @@ void m2Data::OnGenerateImageData(mitk::DataNode::Pointer node,
   }
 }
 
+
+void m2Data::OnCreateShiftMap()
+{
+// get the selection
+  auto nodesToProcess = m2::UIUtils::AllNodes(GetDataStorage());
+
+  if (nodesToProcess->empty())
+    return;
+
+  // process all nodes
+  for (mitk::DataNode::Pointer dataNode : *nodesToProcess)
+    if (m2::ImzMLSpectrumImage::Pointer data = dynamic_cast<m2::ImzMLSpectrumImage *>(dataNode->GetData()))
+    {
+
+      auto shiftMapFilter = m2::ShiftMapImageFilter::New();
+
+      shiftMapFilter->SetInput(data);
+      shiftMapFilter->GenerateData();
+      
+
+      auto node = mitk::DataNode::New();
+      node->SetData(shiftMapFilter->GetOutput(0));
+      node->SetName("Absolute_mz_shift");
+      GetDataStorage()->Add(node);
+
+      node = mitk::DataNode::New();
+      node->SetData(shiftMapFilter->GetOutput(1));
+      node->SetName("Index_mz_shift");
+      GetDataStorage()->Add(node);
+
+    }
+}
+
+
 void m2Data::OnGenerateImageData(qreal xRangeCenter, qreal xRangeTol)
 {
   // get the selection
@@ -883,6 +917,23 @@ void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
     this->GetDataStorage()->Add(helperNode, const_cast<mitk::DataNode *>(node));
     // consideration of the check boxes
     emit m_Controls.showMaskImages->toggled(m_Controls.showMaskImages->isChecked());
+
+    // -------------- add ShiftImage to datastorage --------------
+    if(spectrumImage->GetShiftImage()){
+
+      helperNode = mitk::DataNode::New();
+      helperNode->SetName("ShiftImage");
+      helperNode->SetVisibility(false);
+      helperNode->SetData(spectrumImage->GetShiftImage());
+      helperNode->SetStringProperty("m2aia.helper.image.name", "ShiftImage");
+      this->GetDataStorage()->Add(helperNode, const_cast<mitk::DataNode *>(node));
+    // helperNode->SetStringProperty("m2aia.helper.image.type", "");
+
+    // add hidden to DS
+    // helperNode->SetBoolProperty("helper object", true);
+    // consideration of the check boxes
+    // emit m_Controls.showMaskImages->toggled(m_Controls.showMaskImages->isChecked());
+    }
 
     // -------------- add Index to datastorage --------------
     helperNode = mitk::DataNode::New();

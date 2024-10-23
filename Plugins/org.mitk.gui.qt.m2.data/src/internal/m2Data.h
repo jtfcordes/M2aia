@@ -94,6 +94,7 @@ public:
 public slots:
   void OnCreateNextImage();
   void OnCreatePrevImage();
+  void OnCreateShiftMap();
   void OnIncreaseTolerance();
   void OnDecreaseTolerance();
   void OnRenderSpectrumImages(double min, double max);
