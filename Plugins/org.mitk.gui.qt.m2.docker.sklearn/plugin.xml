@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin>
+  <extension point="org.blueberry.ui.views">
+    <view id="org.mitk.views.docker.sklearn"
+          name="Sklearn View"
+          class="QmitkSklearnView"
+          category="Spectrum imaging (Docker)"
+          icon="resources/logo.svg" />
+  </extension>
+</plugin>
