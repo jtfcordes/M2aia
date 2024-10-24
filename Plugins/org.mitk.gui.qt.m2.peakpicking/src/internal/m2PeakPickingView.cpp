@@ -39,6 +39,7 @@ See LICENSE.txt or https://www.github.com/jtfcordes/m2aia for details.
 #include <signal/m2Binning.h>
 #include <signal/m2MedianAbsoluteDeviation.h>
 #include <signal/m2PeakDetection.h>
+#include <m2ElxRegistrationHelper.h>
 
 // itk
 #include <itkExtractImageFilter.h>
@@ -48,6 +49,7 @@ See LICENSE.txt or https://www.github.com/jtfcordes/m2aia for details.
 // mitk image
 #include <QmitkSingleNodeSelectionWidget.h>
 #include <mitkImage.h>
+#include <mitkImageCast.h>
 #include <mitkImageAccessByItk.h>
 #include <mitkImagePixelReadAccessor.h>
 #include <mitkImagePixelWriteAccessor.h>
@@ -254,23 +256,121 @@ void m2PeakPickingView::OnStartExportImages() {
   auto imageNodes = m_Controls.imageExportSelector->GetSelectedNodesStdVector();
   auto centroidNodes = m_Controls.centroidExportSelector->GetSelectedNodesStdVector();
   float tol = 1;
+  // QString file = QFileDialog::getSaveFileName(nullptr, tr("Save Stack"), "~/");
+
 
   for(auto imageNode : imageNodes){
     auto image = dynamic_cast<m2::SpectrumImage *>(imageNode->GetData());
+
+    unsigned int component = 0 ;
     for(auto centroidNode : centroidNodes){
       auto centroids = dynamic_cast<m2::IntervalVector *>(centroidNode->GetData());
-      for(const m2::Interval & i: centroids->GetIntervals()){
-        emit m2::UIUtils::Instance()->RequestTolerance(i.x.mean(), tol);
-        auto ionImage = mitk::Image::New();
-        ionImage->Initialize(dynamic_cast<mitk::Image *>(image));
-        image->GetImage(i.x.mean(), tol, nullptr, ionImage );
-        auto node = mitk::DataNode::New();
-        node->SetData(ionImage);
-        node->SetName(imageNode->GetName() + "_" + std::to_string(i.x.mean()));
-        node->SetVisibility(false);
-        GetDataStorage()->Add(node, const_cast<mitk::DataNode *>(centroidNode.GetPointer()));
-        // mitk::IOUtil::Save(ionImage, "/tmp/" +imageNode->GetName() + "_" + std::to_string(i.x.mean()) + ".nrrd");
+
+      std::string registrationPath0, registrationPath1;
+      imageNode->GetStringProperty("m2aia.registration.path.0", registrationPath0);
+      imageNode->GetStringProperty("m2aia.registration.path.1", registrationPath1);
+      std::shared_ptr<m2::ElxRegistrationHelper> helper;
+      
+      if(!registrationPath0.empty()){
+        helper = std::make_shared<m2::ElxRegistrationHelper>();
+        std::array<std::string,2> paths{registrationPath0, registrationPath1};
+        std::vector<std::string> params;
+        
+        for (auto p : paths){
+          if(p.empty()) continue;
+          std::ifstream reader(p);
+          std::string s((std::istreambuf_iterator<char>(reader)), std::istreambuf_iterator<char>());
+          params.push_back(s);
+          MITK_INFO << s;
+        }
+        helper->SetTransformations(params);
       }
+
+      
+      mitk::Image::Pointer ionImage = image;
+      if(helper)
+        ionImage = helper->WarpImage(image);
+
+      // auto stack = mitk::Image::New();
+      // mitk::PixelType newPixelType = mitk::MakePixelType<typename itk::VectorImage<m2::DisplayImagePixelType, 3>>(centroids->GetIntervals().size());
+      // auto clone = ionImage->GetGeometry()->Clone();
+      // stack->Initialize(newPixelType, *clone);
+      using PixelType = m2::DisplayImagePixelType;
+      auto vectorImage = itk::VectorImage<PixelType, 3>::New();
+      vectorImage->SetVectorLength(centroids->GetIntervals().size());
+      
+
+      itk::Image<PixelType, 3>::IndexType start;
+      start[0] = 0;
+      start[1] = 0;
+      start[2] = 0;
+
+      itk::Image<PixelType, 3>::SizeType size;
+      auto dimensions = ionImage->GetDimensions();
+      size[0] = dimensions[0];
+      size[1] = dimensions[1];
+      size[2] = dimensions[2];
+      itk::Image<PixelType, 3>::RegionType region;
+      region.SetSize(size);
+      region.SetIndex(start);
+      vectorImage->SetRegions(region);
+      
+      vectorImage->Allocate();
+
+      itk::VariableLengthVector<PixelType> initialPixelValues;
+      initialPixelValues.SetSize(centroids->GetIntervals().size());
+      initialPixelValues.Fill(0.0);
+      itk::ImageRegionIterator<itk::VectorImage<PixelType, 3>> imageIterator(vectorImage,
+                                                                            vectorImage->GetRequestedRegion());
+
+      while (!imageIterator.IsAtEnd())
+      {
+        imageIterator.Set(initialPixelValues);
+        ++imageIterator;
+      }
+
+      mitk::Image::Pointer stack;
+      mitk::CastToMitkImage(vectorImage, stack);
+
+      stack->SetSpacing(ionImage->GetGeometry()->GetSpacing());
+      stack->SetOrigin(ionImage->GetGeometry()->GetOrigin());
+      stack->GetGeometry()->SetIndexToWorldTransform(ionImage->GetGeometry()->GetIndexToWorldTransform());
+
+      
+      for(const m2::Interval & i: centroids->GetIntervals()){
+
+        emit m2::UIUtils::Instance()->RequestTolerance(i.x.mean(), tol);
+        image->GetImage(i.x.mean(), tol, image->GetMaskImage(), image);
+        
+        if(helper)
+          ionImage = helper->WarpImage(image, "double");
+        else
+          ionImage = image;
+
+        mitk::ImagePixelReadAccessor<m2::DisplayImagePixelType,3> imageAcc(ionImage);
+        imageAcc.GetData();
+        mitk::ImagePixelReadAccessor<m2::DisplayImagePixelType,3> stackAcc(stack);
+        for(unsigned int x = 0; x < ionImage->GetDimensions()[0]; ++x)
+          for(unsigned int y = 0; y < ionImage->GetDimensions()[1]; ++y)
+            for(unsigned int z = 0; z < ionImage->GetDimensions()[2]; ++z){
+                auto v = stackAcc.GetConsecutivePixelsAsVector({x,y,z}, centroids->GetIntervals().size());
+                v[component] = imageAcc.GetPixelByIndex({x,y,z});
+                
+
+            }
+        
+        
+        ++component;
+
+        
+      }
+
+      auto node = mitk::DataNode::New();
+      node->SetData(stack);
+      node->SetName(imageNode->GetName() + ".stack");
+      node->SetVisibility(false);
+      GetDataStorage()->Add(node);
+      // mitk::IOUtil::Save(stack, file.toStdString());
     }
   }
 
