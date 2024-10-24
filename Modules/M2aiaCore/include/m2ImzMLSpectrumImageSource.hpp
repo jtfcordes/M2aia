@@ -426,9 +426,9 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
     mitkThrow() << "Please provide an image into which the data can be written.";
 
   // clear the image conten
-  {
-  AccessByItk(destImage, [](auto itkImg) { itkImg->FillBuffer(0); });
-  }
+  // {
+  // AccessByItk(destImage, [](auto itkImg) { itkImg->FillBuffer(0); });
+  // }
 
   // Get the normalization type
   const auto currentType = p->GetNormalizationStrategy();
@@ -437,6 +437,14 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
 
   mitk::ImagePixelReadAccessor<NormImagePixelType, 3> normAccess(p->GetNormalizationImage());
   mitk::ImagePixelWriteAccessor<DisplayImagePixelType, 3> imageAccess(destImage);
+
+  {
+    auto d = destImage->GetDimensions();
+    auto N = std::accumulate(d, d+destImage->GetDimension(), 1, std::multiplies<>());
+    auto dataPointer = imageAccess.GetData();
+    std::fill(dataPointer, dataPointer + N, 0);
+  
+  }
     
 
   // check if the normalization image for a given type
@@ -1181,13 +1189,13 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
 
   for (int k = 0; k < binsN; ++k)
   {
-    // if (hT[0][k] > (spectra.size() * (minHits / 100.0)))
-    // {
+    if (hT[0][k] > 0)
+    {
       mzAxis.push_back(xT[0][k] / (double)hT[0][k]);
       sum.push_back(yT[0][k]);
       mean.push_back(yT[0][k] / (double)hT[0][k]);
       skyline.push_back(yMaxT[0][k]);
-    // }
+    }
   }
 
   xT.clear();
