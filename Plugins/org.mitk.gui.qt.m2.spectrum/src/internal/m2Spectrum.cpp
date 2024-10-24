@@ -22,31 +22,31 @@ See LICENSE.txt for details.
 // Qt includes
 // #include <QApplication>
 #include <QColor>
+#include <QComboBox>
+#include <QFileDialog>
 #include <QGraphicsSimpleTextItem>
 #include <QLabel>
+#include <QLineSeries>
 #include <QMenu>
+#include <QPushButton>
 #include <QShortcut>
 #include <QValueAxis>
 #include <QWidgetAction>
 #include <QXYSeries>
-#include <QComboBox>
-#include <QPushButton>
-#include <QFileDialog>
-#include <QLineSeries>
 
 // MITK includes
+#include <QmitkIOUtil.h>
 #include <mitkColorProperty.h>
 #include <mitkCoreServices.h>
 #include <mitkIPreferences.h>
 #include <mitkIPreferencesService.h>
 #include <mitkLookupTableProperty.h>
 #include <mitkStatusBar.h>
-#include <QmitkIOUtil.h>
 
 // M2aia includes
 #include <m2ImzMLSpectrumImage.h>
-#include <m2UIUtils.h>
 #include <m2SpectrumImage.h>
+#include <m2UIUtils.h>
 #include <signal/m2PeakDetection.h>
 
 // internal includes
@@ -344,8 +344,6 @@ void m2Spectrum::NodeAdded(const mitk::DataNode *node)
     provider->Initialize(intervals);
     provider->GetSeries()->setName(node->GetName().c_str());
     provider->GetSeries()->setVisible(isVisible);
- 
-
 
     m_DataProvider[node] = provider;
     m_NodeRelatedGraphicItems[node] = new QGraphicsItemGroup();
@@ -431,7 +429,8 @@ void m2Spectrum::OnMouseMove(
   // MITK_INFO("m2Spectrum::OnMouseMove") << "Mouse Pressed";
 }
 
-void m2Spectrum::OnMouseRelease(QPointF pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod)
+void m2Spectrum::OnMouseRelease(
+  QPointF pos, qreal mz, qreal intValue, Qt::MouseButton button, Qt::KeyboardModifiers mod)
 {
   Q_UNUSED(pos)
   Q_UNUSED(intValue)
@@ -612,7 +611,7 @@ void m2Spectrum::CreateQtPartControl(QWidget *parent)
   CreateQChartView();
   CreateQChartViewMenu();
 
-	auto* preferencesService = mitk::CoreServices::GetPreferencesService();
+  auto *preferencesService = mitk::CoreServices::GetPreferencesService();
 	m_M2aiaPreferences = preferencesService->GetSystemPreferences();
 
   m_Controls.chartView->chart()->legend()->setVisible(false);
@@ -625,43 +624,44 @@ void m2Spectrum::CreateQtPartControl(QWidget *parent)
   m_Controls.comboBox->addItem("HighContrast", QChart::ChartThemeHighContrast);
   m_Controls.comboBox->addItem("Light", QChart::ChartThemeLight);
   m_Controls.comboBox->addItem("Qt", QChart::ChartThemeQt);
-  
-
 
   connect(m_Controls.comboBox,
           qOverload<int>(&QComboBox::highlighted),
           this,
-          [&](int i) { 
+          [&](int i)
+          {
             auto theme = static_cast<QChart::ChartTheme>(m_Controls.comboBox->itemData(i).toInt());          
 
-            if(!m_Chart->series().empty()){
+            if (!m_Chart->series().empty())
+            {
               QPen pen;
-              if(auto xySeriesPre = dynamic_cast<QXYSeries*>(m_Chart->series().front())){
+              if (auto xySeriesPre = dynamic_cast<QXYSeries *>(m_Chart->series().front()))
+              {
                 pen = xySeriesPre->pen();
-                MITK_INFO << xySeriesPre->pen().widthF();
+               // MITK_INFO << xySeriesPre->pen().widthF();
               }
               
               m_Chart->setTheme(theme);
 
-              foreach(QAbstractSeries * series, m_Chart->series()){
-                if(auto xySeriesPost = dynamic_cast<QXYSeries *>(series)){
-                  auto pen =  xySeriesPost->pen();
+              foreach (QAbstractSeries *series, m_Chart->series())
+              {
+                if (auto xySeriesPost = dynamic_cast<QXYSeries *>(series))
+                {
+                  auto pen = xySeriesPost->pen();
                   pen.setWidthF(0.75);
                   xySeriesPost->setPen(pen);
                 }
               }
             }
-            
            });
-
 
   connect(m_Controls.comboBox,
           qOverload<int>(&QComboBox::currentIndexChanged),
           this,
-          [&](int i) { 
+          [&](int i)
+          {
             auto theme = static_cast<QChart::ChartTheme>(m_Controls.comboBox->itemData(i).toInt());
             m_Chart->setTheme(theme);
-            
            });
 
   m_Controls.comboBox->setCurrentIndex(4);
@@ -669,10 +669,10 @@ void m2Spectrum::CreateQtPartControl(QWidget *parent)
   connect(m_Controls.saveButton,
           &QPushButton::clicked,
           this,
-          [&]() { 
-            auto name = QFileDialog::getSaveFileName(m_Controls.chartView, tr("Save File"),
-                           "/home/jana/untitled.png",
-                           tr("Images (*.png *.xpm *.jpg)"));
+          [&]()
+          {
+            auto name = QFileDialog::getSaveFileName(
+              m_Controls.chartView, tr("Save File"), "/home/jana/untitled.png", tr("Images (*.png *.xpm *.jpg)"));
             auto r = m_Controls.chartView->rect();
             r.setX(r.x() + 10);
             r.setY(r.y() + 10);
@@ -682,7 +682,6 @@ void m2Spectrum::CreateQtPartControl(QWidget *parent)
 
             m_Controls.chartView->grab(r).save(name);
            });
-
 }
 
 void m2Spectrum::CreateQChartViewMenu()
@@ -794,25 +793,17 @@ void m2Spectrum::CreateQChartViewMenu()
 
   wActionY->setDefaultWidget(m_TickCountY);
 
-
-
-
-
   m_Menu->addAction(wActionXLabel);
   m_Menu->addAction(wActionX);
 
   m_Menu->addAction(wActionYLabel);
   m_Menu->addAction(wActionY);
 
-  
-
   m_Controls.chartView->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(m_Controls.chartView,
           &QChartView::customContextMenuRequested,
           this,
           [&](const QPoint &pos) { m_Menu->exec(m_Controls.chartView->viewport()->mapToGlobal(pos)); });
-
-
 }
 
 void m2Spectrum::CreateQChartView()
@@ -844,10 +835,10 @@ void m2Spectrum::AutoZoomUseLocalExtremaY()
   if (m_DataProvider.empty())
     return;
 
-  bool useMaxIntensity =  m_M2aiaPreferences->GetBool("m2aia.view.spectrum.useMaxIntensity", true);
+  bool useMaxIntensity = m_M2aiaPreferences->GetBool("m2aia.view.spectrum.useMaxIntensity", true);
   bool useMinIntensity = m_M2aiaPreferences->GetBool("m2aia.view.spectrum.useMinIntensity", true);
 
-  if ( useMaxIntensity || useMinIntensity)
+  if (useMaxIntensity || useMinIntensity)
   {
     if (useMaxIntensity)
     {
@@ -915,7 +906,6 @@ void m2Spectrum::NodeRemoved(const mitk::DataNode *node)
       }
     }
   }
-
 
   // OnResetView();
 }
