@@ -107,16 +107,20 @@ void QmitkUMAPView::OnStartDockerProcessing()
 
           // feed back results into MTIK
           auto refImage = dynamic_cast<mitk::Image *>(imageNode->GetData());
-          auto image = dynamic_cast<mitk::Image *>(results[0].GetPointer());
+          mitk::Image::Pointer image = dynamic_cast<mitk::Image *>(results[0].GetPointer());
+          if(m_Controls.n_components->value() == 3)
+            image = m2::MassSpecVisualizationFilter::ConvertMitkVectorImageToRGB(image);
+          
           image->GetGeometry()->SetSpacing(refImage->GetGeometry()->GetSpacing());
           image->GetGeometry()->SetOrigin(refImage->GetGeometry()->GetOrigin());
 
-          auto cImage = m2::MassSpecVisualizationFilter::ConvertMitkVectorImageToRGB(image);
-          cImage->GetGeometry()->SetSpacing(refImage->GetGeometry()->GetSpacing());
-          cImage->GetGeometry()->SetOrigin(refImage->GetGeometry()->GetOrigin());
+          
+
+          
+          
 
           auto newNode = mitk::DataNode::New();
-          newNode->SetData(cImage);
+          newNode->SetData(image);
           newNode->SetName(imageNode->GetName() + "_umap");
 
           GetDataStorage()->Add(newNode, const_cast<mitk::DataNode *>(imageNode.GetPointer()));

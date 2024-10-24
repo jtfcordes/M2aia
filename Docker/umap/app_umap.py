@@ -135,6 +135,9 @@ O = np.zeros((s[0], s[1], s[2], args.n_components))
 
 # reshape data back to image sapce
 for i in range(args.n_components):
+    Y[...,i] = Y[...,i]-np.min(Y[...,i])
+    Y[...,i] = Y[...,i]/np.max(Y[...,i])*255.0
+
     O[...,i][M==1] = Y[...,i]
 
 # write the image as a vector image
