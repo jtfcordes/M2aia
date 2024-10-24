@@ -50,6 +50,7 @@ namespace m2
 
   const std::array<std::string, 5> RangePoolingStrategyTypeNames = {"None", "Mean", "Median", "Maximum", "Sum"};
 
+  // NormalizationStrategyType
   enum class NormalizationStrategyType : unsigned int
   {
     None = 0, TIC ,Sum, Mean, Max, RMS, Internal, External
@@ -70,6 +71,12 @@ namespace m2
     "None", "TIC", "Sum", "Mean", "Max", "RMS", "Internal", "External"};
 
 
+  inline std::string to_string(m2::NormalizationStrategyType type){
+    return NormalizationStrategyTypeNames.at(to_underlying(type));
+  }
+
+
+  // ImageNormalizationStrategyType
   enum class ImageNormalizationStrategyType : unsigned int
   {
     None = 0, MinMax, zScore
@@ -86,11 +93,30 @@ namespace m2
   const std::array<std::string, 3> ImageNormalizationStrategyTypeNames = {
     "None", "MinMax", "zScore"};
 
-  inline std::string to_string(m2::NormalizationStrategyType type){
-    return NormalizationStrategyTypeNames.at(to_underlying(type));
+  inline std::string to_string(m2::ImageNormalizationStrategyType type){
+    return ImageNormalizationStrategyTypeNames.at(to_underlying(type));
   }
 
+  // ImageSmoothingStrategyType
+  enum class ImageSmoothingStrategyType : unsigned int
+  {
+    None = 0, Median, Gaussian
+  };
 
+  const std::array<ImageSmoothingStrategyType, 3> ImageSmoothingStrategyTypeList = {
+    ImageSmoothingStrategyType::None,
+    ImageSmoothingStrategyType::Median,
+    ImageSmoothingStrategyType::Gaussian
+  };
+
+  const std::array<std::string, 3> ImageSmoothingStrategyTypeNames = {
+    "None", "Median", "Gaussian"};
+
+  inline std::string to_string(m2::ImageSmoothingStrategyType type){
+    return ImageSmoothingStrategyTypeNames.at(to_underlying(type));
+  }
+
+  // BaselineCorrectionType
   enum class BaselineCorrectionType : unsigned int
   {
     None = 0,

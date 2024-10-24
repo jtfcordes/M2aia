@@ -17,6 +17,8 @@ See LICENSE.txt for details.
 
 #include <M2aiaCoreExports.h>
 #include <itkCastImageFilter.h>
+#include <itkMedianImageFilter.h>
+#include <itkDiscreteGaussianImageFilter.h>
 #include <m2ISpectrumImageSource.h>
 #include <m2ImzMLSpectrumImage.h>
 #include <m2CoreCommon.h>
@@ -589,12 +591,88 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
       });
   }
 
- // normalize ion image post generation
+  // Normalize the image
   const auto bufferN = std::accumulate(destImage->GetDimensions(), destImage->GetDimensions() + 3, 1, std::multiplies<>());
-  if(p->GetImageNormalizationStrategy() == m2::ImageNormalizationStrategyType::zScore)
-    StandardizeImage(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), imageAccess.GetData());
-  else if(p->GetImageNormalizationStrategy() == m2::ImageNormalizationStrategyType::MinMax)
-    MinMaxNormalizeImage(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), imageAccess.GetData());
+  switch(p->GetImageNormalizationStrategy()){
+    case m2::ImageNormalizationStrategyType::zScore:
+    {
+      StandardizeImage(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), imageAccess.GetData()); 
+      break;
+    }
+    case m2::ImageNormalizationStrategyType::MinMax:
+    {
+      MinMaxNormalizeImage(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), imageAccess.GetData());
+      break;
+    }
+    case m2::ImageNormalizationStrategyType::None:
+    default:
+    {
+      break;
+    }
+  }
+
+  switch(p->GetImageSmoothingStrategy()){
+    case m2::ImageSmoothingStrategyType::Median:
+    {
+      using ItkImageType = itk::Image<DisplayImagePixelType, 3>;
+      using MedianFilterType = itk::MedianImageFilter<ItkImageType, ItkImageType>;
+      auto medianFilter = MedianFilterType::New();
+      ItkImageType::Pointer itkImage = ItkImageType::New();
+      mitk::CastToItkImage(destImage->Clone(), itkImage);
+      medianFilter->SetInput(itkImage);
+      MedianFilterType::InputSizeType radius;
+      radius.Fill(1); // Set the radius for the median filter
+      medianFilter->SetRadius(radius);
+      medianFilter->Update();
+
+      // Copy the filtered image back to the destination image
+      auto filteredImage = medianFilter->GetOutput();
+      std::copy(filteredImage->GetBufferPointer(), filteredImage->GetBufferPointer() + bufferN, imageAccess.GetData());
+      break;
+    }
+    case m2::ImageSmoothingStrategyType::Gaussian:
+    {
+      using ItkImageType = itk::Image<DisplayImagePixelType, 3>;
+      using GaussianFilterType = itk::DiscreteGaussianImageFilter<ItkImageType, ItkImageType>;
+      auto gaussianFilter = GaussianFilterType::New();
+      ItkImageType::Pointer itkImage = ItkImageType::New();
+      mitk::CastToItkImage(destImage->Clone(), itkImage);
+      auto spacing = itkImage->GetSpacing();
+      double variance = std::pow(spacing[0]*0.66, 2);
+      gaussianFilter->SetVariance(variance);
+      gaussianFilter->SetInput(itkImage);
+      gaussianFilter->Update();
+
+      // Copy the filtered image back to the destination image
+      auto filteredImage = gaussianFilter->GetOutput();
+      std::copy(filteredImage->GetBufferPointer(), filteredImage->GetBufferPointer() + bufferN, imageAccess.GetData());
+      break;
+    }
+    case m2::ImageSmoothingStrategyType::None:
+    default:
+    {
+      break;
+    }
+  }
+
+
+  // Reduce noise in the image
+  // Apply median filter to reduce noise in the image
+  using ItkImageType = itk::Image<DisplayImagePixelType, 3>;
+  using MedianFilterType = itk::MedianImageFilter<ItkImageType, ItkImageType>;
+  auto medianFilter = MedianFilterType::New();
+  ItkImageType::Pointer itkImage = ItkImageType::New();
+  mitk::CastToItkImage(destImage->Clone(), itkImage);
+  medianFilter->SetInput(itkImage);
+  MedianFilterType::InputSizeType radius;
+  radius.Fill(1); // Set the radius for the median filter
+  medianFilter->SetRadius(radius);
+  medianFilter->Update();
+
+  // Copy the filtered image back to the destination image
+  auto filteredImage = medianFilter->GetOutput();
+  std::copy(filteredImage->GetBufferPointer(), filteredImage->GetBufferPointer() + bufferN, imageAccess.GetData());
+  
  
 }
 
