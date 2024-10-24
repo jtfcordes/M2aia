@@ -509,7 +509,7 @@ void m2Data::OnCreateNextImage()
   auto offset = m_Controls.spnBxTol->value();
   if (m_Controls.rbtnTolPPM->isChecked())
   {
-    offset = m2::PartPerMillionToFactor(offset) * center;
+    offset = m2::PartPerMillionToFactor(offset)*.5 * center;
   }
   this->OnGenerateImageData(center + offset, FROM_GUI);
 }
@@ -520,9 +520,113 @@ void m2Data::OnCreatePrevImage()
   auto offset = m_Controls.spnBxTol->value();
   if (m_Controls.rbtnTolPPM->isChecked())
   {
-    offset = m2::PartPerMillionToFactor(offset) * center;
+    offset = m2::PartPerMillionToFactor(offset)*.5 * center;
   }
   this->OnGenerateImageData(center - offset, FROM_GUI);
+}
+
+void m2Data::OnCreateNextPeakImage()
+{
+  auto predicate = mitk::TNodePredicateDataType<m2::IntervalVector>::New();
+  auto processableNodes = GetDataStorage()->GetSubset(predicate)->CastToSTLConstContainer();
+
+  auto center = m_Controls.spnBxMz->value();
+  auto tolerance = m_Controls.spnBxTol->value();
+  if (m_Controls.rbtnTolPPM->isChecked())
+    tolerance = m2::PartPerMillionToFactor(tolerance)*.5 * center;
+  
+  std::vector<m2::Interval> nearestValues;
+  for (auto node : processableNodes)
+  {
+    if (auto intervalVector = dynamic_cast<m2::IntervalVector *>(node->GetData()))
+    {
+      const auto intervalType = to_underlying(intervalVector->GetType());
+      const auto centroidType = to_underlying(m2::SpectrumFormat::Centroid);
+      if (intervalType & centroidType)
+      {
+        auto intervals = intervalVector->GetIntervals();
+        auto nearestElement = std::min_element(intervals.begin(),
+                                               intervals.end(),
+                                               [center, tolerance](const m2::Interval &a, const m2::Interval &b)
+                                               {
+                                                 // Ensure both are greater than target, and compare only those
+                                                 if (a.x.mean() <= center + tolerance)
+                                                   return false;
+                                                 if (b.x.mean() <= center + tolerance)
+                                                   return true;
+                                                 return a.x.mean() < b.x.mean();
+                                               });
+        if (nearestElement == intervals.end() || nearestElement->x.mean() <= center)
+          continue;
+        
+        nearestValues.push_back(*nearestElement);
+      }
+    }
+  }
+
+  auto nearestElement = std::min_element(nearestValues.begin(),
+                   nearestValues.end(),
+                   [center](const m2::Interval &a, const m2::Interval &b)
+                   {
+                     return a.x.mean() < b.x.mean();
+                   });
+
+  if (nearestElement == nearestValues.end())
+    return; // no peak found
+
+  this->OnGenerateImageData(nearestElement->x.mean(), FROM_GUI);
+}
+
+void m2Data::OnCreatePrevPeakImage()
+{
+  auto predicate = mitk::TNodePredicateDataType<m2::IntervalVector>::New();
+  auto processableNodes = GetDataStorage()->GetSubset(predicate)->CastToSTLConstContainer();
+
+  auto center = m_Controls.spnBxMz->value();
+  auto tolerance = m_Controls.spnBxTol->value();
+  if (m_Controls.rbtnTolPPM->isChecked())
+    tolerance = m2::PartPerMillionToFactor(tolerance)*.5 * center;
+  
+  std::vector<m2::Interval> nearestValues;
+  for (auto node : processableNodes)
+  {
+    if (auto intervalVector = dynamic_cast<m2::IntervalVector *>(node->GetData()))
+    {
+      const auto intervalType = to_underlying(intervalVector->GetType());
+      const auto centroidType = to_underlying(m2::SpectrumFormat::Centroid);
+      if (intervalType & centroidType)
+      {
+        auto intervals = intervalVector->GetIntervals();
+        auto nearestElement = std::min_element(intervals.begin(),
+                                               intervals.end(),
+                                               [center, tolerance](const m2::Interval &a, const m2::Interval &b)
+                                               {
+                                                 // Ensure both are greater than target, and compare only those
+                                                 if (a.x.mean() >= center - tolerance)
+                                                   return false;
+                                                 if (b.x.mean() >= center - tolerance)
+                                                   return true;
+                                                 return a.x.mean() > b.x.mean();
+                                               });
+        if (nearestElement == intervals.end() || nearestElement->x.mean() >= center)
+          continue;
+        
+        nearestValues.push_back(*nearestElement);
+      }
+    }
+  }
+
+  auto nearestElement = std::min_element(nearestValues.begin(),
+                   nearestValues.end(),
+                   [center](const m2::Interval &a, const m2::Interval &b)
+                   {
+                     return a.x.mean() > b.x.mean();
+                   });
+
+  if (nearestElement == nearestValues.end()) 
+    return; // no peak found
+
+  this->OnGenerateImageData(nearestElement->x.mean(), FROM_GUI);
 }
 
 void m2Data::ApplySettingsToNodes(m2::UIUtils::NodesVectorType::Pointer v)

@@ -85,6 +85,8 @@ namespace m2
 
     void NextImage();
     void PreviousImage();
+    void NextPeakImage();
+    void PreviousPeakImage();
     void IncreaseTolerance();
     void DecreaseTolerance(); 
     void RequestTolerance(float x, float & tol);

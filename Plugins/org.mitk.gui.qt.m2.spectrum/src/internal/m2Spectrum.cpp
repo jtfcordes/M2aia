@@ -597,6 +597,8 @@ void m2Spectrum::CreateQtPartControl(QWidget *parent)
 
   QShortcut *shortcutLeft = new QShortcut(QKeySequence(Qt::Key_Left), parent);
   QShortcut *shortcutRight = new QShortcut(QKeySequence(Qt::Key_Right), parent);
+  QShortcut *shortcutShiftLeft = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Left), parent);
+  QShortcut *shortcutShiftRight = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Right), parent);
   QShortcut *shortcutUp = new QShortcut(QKeySequence(Qt::Key_Up), parent);
   QShortcut *shortcutDown = new QShortcut(QKeySequence(Qt::Key_Down), parent);
 
@@ -605,6 +607,8 @@ void m2Spectrum::CreateQtPartControl(QWidget *parent)
 
   connect(shortcutRight, SIGNAL(activated()), UIUtilsObject, SIGNAL(NextImage()));
   connect(shortcutLeft, SIGNAL(activated()), UIUtilsObject, SIGNAL(PreviousImage()));
+  connect(shortcutShiftRight, SIGNAL(activated()), UIUtilsObject, SIGNAL(NextPeakImage()));
+  connect(shortcutShiftLeft, SIGNAL(activated()), UIUtilsObject, SIGNAL(PreviousPeakImage()));
   connect(shortcutUp, SIGNAL(activated()), UIUtilsObject, SIGNAL(IncreaseTolerance()));
   connect(shortcutDown, SIGNAL(activated()), UIUtilsObject, SIGNAL(DecreaseTolerance()));
 

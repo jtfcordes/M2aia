@@ -95,6 +95,8 @@ public:
 public slots:
   void OnCreateNextImage();
   void OnCreatePrevImage();
+  void OnCreatePrevPeakImage();
+  void OnCreateNextPeakImage();
   void OnCreateShiftMap();
   void OnIncreaseTolerance();
   void OnDecreaseTolerance();
