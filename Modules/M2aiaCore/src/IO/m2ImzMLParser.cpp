@@ -248,6 +248,20 @@ void m2::ImzMLParser::ReadImageMetaData(m2::ImzMLSpectrumImage::Pointer data)
     data->SetPropertyValue<std::string>("m2aia.imzml.format_type", name);
     }; 
 
+
+        // https://github.com/m2aia/imzML/blob/master/imagingMS.obo#L113
+    accession_map["MS:1000127"] = [&](auto line) { // "continuous"
+      ContextValueToStringProperty(line);
+    data->SetPropertyValue<std::string>("m2aia.imzml.spectrum_type", name);
+    }; 
+
+    // https://github.com/m2aia/imzML/blob/master/imagingMS.obo#L119
+    accession_map["MS:1000128"] = [&](auto line) { // "processed"
+      ContextValueToStringProperty(line); 
+    data->SetPropertyValue<std::string>("m2aia.imzml.spectrum_type", name);
+    }; 
+
+
     // Attention: we should not specify a default value, for the name here.
     // Describes the length of a pixel in the x dimension. If no pixel size y (IMS:1000047) is explicitly specified,
     // then this also describes the length of a pixel in the y dimension."
@@ -286,10 +300,32 @@ void m2::ImzMLParser::ReadImageMetaData(m2::ImzMLSpectrumImage::Pointer data)
     context_map["instrumentConfiguration"] = [&](const std::string &line) { attributeValue(line, "id", context); };
     context_map["dataProcessing"] = [&](const std::string &line) { attributeValue(line, "id", context); };
 
+    std::string dataProcessingId;
+    std::string processingMethodOrder;
+    std::string processingMethodSoftwareRef;
+    context_map["dataProcessing"] = [&](const std::string &line){
+      attributeValue(line, "id", dataProcessingId);
+      // context = context + ".dataProcessing (" + dataProcessingId + ")";
+      // MITK_INFO << dataProcessingId;
+    };
+
     context_map["processingMethod"] = [&](const std::string &line)
     {
-      attributeValue(line, "order", value);
-      context = context + ".processingMethod (" + value + ")";
+      attributeValue(line, "order", processingMethodOrder);
+      attributeValue(line, "softwareRef", processingMethodSoftwareRef);
+      // MITK_INFO << processingMethodOrder << " " << processingMethodSoftwareRef;
+    };
+
+    context_map["userParam"] = [&](const std::string &line)
+    {
+      std::string description;
+      std::string method_value;
+      attributeValue(line, "name", description);
+      attributeValue(line, "value", method_value);
+      data->SetPropertyValue<std::string>("m2aia.imzml."+dataProcessingId+"." +processingMethodSoftwareRef+"."+processingMethodOrder+".description", description);
+      data->SetPropertyValue<std::string>("m2aia.imzml."+dataProcessingId+"." +processingMethodSoftwareRef+"."+processingMethodOrder+".value", method_value);
+
+      // MITK_INFO << description << " " << method_value;
     };
 
     // default values
@@ -320,6 +356,7 @@ void m2::ImzMLParser::ReadImageMetaData(m2::ImzMLSpectrumImage::Pointer data)
           context_stack.pop_back();
           context.clear();
         }
+
         // Check for empty-element tag. Can be cvParam or userParam (e.g. used by ScilsLab).
         else if (line.rfind("/>") != std::string::npos) // element
         {
@@ -336,9 +373,15 @@ void m2::ImzMLParser::ReadImageMetaData(m2::ImzMLSpectrumImage::Pointer data)
             // }
             // Fallback if context specific accession is not found.
             auto status = evaluateAccession(line, accession, accession_map);
+            accession.clear();
             if (!status) // Default: name + value is added to IMS data property list
               ContextValueToStringProperty(line);
+          }else{
+            GetElementName(line, tag);
+            context_stack.push_back(tag);
+            EvaluateContext(line, tag, context_map);
           }
+  
         }
 
         else // open context
