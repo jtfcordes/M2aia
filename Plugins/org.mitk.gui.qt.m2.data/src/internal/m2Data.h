@@ -89,6 +89,7 @@ public:
   void InitToleranceControls();
   void InitBaselineCorrectionControls();
   void InitImageNormalizationControls();
+  void InitImageSmoothingControls();
   
   
 
@@ -110,6 +111,7 @@ public slots:
   m2::SmoothingType GuiToSmoothingStrategyType();  
   m2::BaselineCorrectionType GuiToBaselineCorrectionStrategyType();
   m2::ImageNormalizationStrategyType GuiToImageNormalizationStrategyType();
+  m2::ImageSmoothingStrategyType GuiToImageSmoothingStrategyType();
   
 
 signals:

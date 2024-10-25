@@ -66,6 +66,7 @@ void m2Data::CreateQtPartControl(QWidget *parent)
   InitSmoothingControls();
   InitIntensityTransformationControls();
   InitImageNormalizationControls();
+  InitImageSmoothingControls();
 
   auto serviceRef = m2::UIUtils::Instance();
   connect(serviceRef, SIGNAL(UpdateImage(qreal, qreal)), this, SLOT(OnGenerateImageData(qreal, qreal)));
@@ -80,6 +81,8 @@ void m2Data::CreateQtPartControl(QWidget *parent)
   auto UIUtilsObject = m2::UIUtils::Instance();
   connect(UIUtilsObject, SIGNAL(PreviousImage()), this, SLOT(OnCreatePrevImage()));
   connect(UIUtilsObject, SIGNAL(NextImage()), this, SLOT(OnCreateNextImage()));
+  connect(UIUtilsObject, SIGNAL(PreviousPeakImage()), this, SLOT(OnCreatePrevPeakImage()));
+  connect(UIUtilsObject, SIGNAL(NextPeakImage()), this, SLOT(OnCreateNextPeakImage()));
   connect(UIUtilsObject, SIGNAL(IncreaseTolerance()), this, SLOT(OnIncreaseTolerance()));
   connect(UIUtilsObject, SIGNAL(DecreaseTolerance()), this, SLOT(OnDecreaseTolerance()));
 
@@ -262,6 +265,17 @@ void m2Data::CreateQtPartControl(QWidget *parent)
             auto value = m_Controls.CBImageNormalization->currentData().toUInt();
             preferences->PutInt("m2aia.signal.ImageNormalizationStrategy", value);
           });
+  connect(m_Controls.CBImageSmoothing,
+          qOverload<int>(&QComboBox::currentIndexChanged),
+          this,
+          [this, preferences](int)
+          {
+            auto value = m_Controls.CBImageSmoothing->currentData().toUInt();
+            preferences->PutInt("m2aia.signal.ImageSmoothingStrategy", value);
+          });
+
+
+          
 
   // default values
   m_Controls.spnBxTol->setValue(preferences->GetFloat("m2aia.signal.Tolerance", 75));
@@ -279,6 +293,9 @@ void m2Data::CreateQtPartControl(QWidget *parent)
   
   m_Controls.CBImageNormalization->setCurrentIndex(
     preferences->GetInt("m2aia.signal.ImageNormalizationStrategy", to_underlying(m2::ImageNormalizationStrategyType::None)));
+  
+  m_Controls.CBImageNormalization->setCurrentIndex(
+    preferences->GetInt("m2aia.signal.ImageSmoothingStrategy", to_underlying(m2::ImageSmoothingStrategyType::None)));
 
   // Make sure, that data nodes added before this view
   // is initialized are handled correctly!!
@@ -378,6 +395,27 @@ m2::ImageNormalizationStrategyType m2Data::GuiToImageNormalizationStrategyType()
   auto value =
     preferences->GetInt("m2aia.signal.ImageNormalizationStrategy", to_underlying(m2::ImageNormalizationStrategyType::None));
   return static_cast<m2::ImageNormalizationStrategyType>(value);
+}
+
+m2::ImageSmoothingStrategyType m2Data::GuiToImageSmoothingStrategyType()
+{
+  auto *preferencesService = mitk::CoreServices::GetPreferencesService();
+  auto *preferences = preferencesService->GetSystemPreferences();
+  auto value =
+    preferences->GetInt("m2aia.signal.ImageSmoothingStrategy", to_underlying(m2::ImageSmoothingStrategyType::None));
+  return static_cast<m2::ImageSmoothingStrategyType>(value);
+}
+
+void m2Data::InitImageSmoothingControls()
+{
+  auto *preferencesService = mitk::CoreServices::GetPreferencesService();
+  auto *preferences = preferencesService->GetSystemPreferences();
+  auto defaultValue =
+    preferences->GetInt("m2aia.signal.ImageSmoothingStrategy", to_underlying(m2::ImageSmoothingStrategyType::None));
+  auto cb = Controls()->CBImageSmoothing;
+  for (unsigned int i = 0; i < m2::ImageSmoothingStrategyTypeNames.size(); ++i)
+    cb->addItem(m2::ImageSmoothingStrategyTypeNames[i].c_str(), {i});
+  cb->setCurrentIndex(defaultValue);
 }
 
 
@@ -646,8 +684,10 @@ void m2Data::ApplySettingsToImage(m2::SpectrumImage *data)
     data->SetBaselineCorrectionStrategy(GuiToBaselineCorrectionStrategyType());
     data->SetSmoothingStrategy(GuiToSmoothingStrategyType());
     data->SetRangePoolingStrategy(GuiToRangePoolingStrategyType());
-    data->SetImageNormalizationStrategy(GuiToImageNormalizationStrategyType());
     data->SetIntensityTransformationStrategy(GuiToIntensityTransformationStrategyType());
+
+    data->SetImageNormalizationStrategy(GuiToImageNormalizationStrategyType());
+    data->SetImageSmoothingStrategy(GuiToImageSmoothingStrategyType());
 
     data->SetSmoothingHalfWindowSize(m_Controls.spnBxSmoothing->value());
     data->SetBaseLineCorrectionHalfWindowSize(m_Controls.spnBxBaseline->value());
@@ -915,6 +955,7 @@ void m2Data::UpdateLevelWindow(const mitk::DataNode *node)
     switch(msImageBase->GetImageNormalizationStrategy()){
       case m2::ImageNormalizationStrategyType::MinMax:
       case m2::ImageNormalizationStrategyType::None:
+      case m2::ImageNormalizationStrategyType::zScore2Sigma:
         lw.SetWindowBounds(0,lw.GetRangeMax());
         break;
       case m2::ImageNormalizationStrategyType::zScore:

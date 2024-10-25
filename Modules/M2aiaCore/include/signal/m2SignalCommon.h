@@ -79,19 +79,20 @@ namespace m2
   // ImageNormalizationStrategyType
   enum class ImageNormalizationStrategyType : unsigned int
   {
-    None = 0, MinMax, zScore
+    None = 0, MinMax, zScore, zScore2Sigma
   };
 
 
-  const std::array<ImageNormalizationStrategyType, 3> ImageNormalizationStrategyTypeList = {
+  const std::array<ImageNormalizationStrategyType, 4> ImageNormalizationStrategyTypeList = {
     ImageNormalizationStrategyType::None,
     ImageNormalizationStrategyType::MinMax,
-    ImageNormalizationStrategyType::zScore
+    ImageNormalizationStrategyType::zScore,
+    ImageNormalizationStrategyType::zScore2Sigma
   };
 
 
-  const std::array<std::string, 3> ImageNormalizationStrategyTypeNames = {
-    "None", "MinMax", "zScore"};
+  const std::array<std::string, 4> ImageNormalizationStrategyTypeNames = {
+    "None", "MinMax", "zScore", "zScore2Sigma"};
 
   inline std::string to_string(m2::ImageNormalizationStrategyType type){
     return ImageNormalizationStrategyTypeNames.at(to_underlying(type));

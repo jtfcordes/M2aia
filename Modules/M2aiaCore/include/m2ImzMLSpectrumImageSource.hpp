@@ -155,6 +155,36 @@ namespace m2
 
   }
 
+
+  template <typename InputIterator, typename MaskIterator, typename OutputIterator>
+  void SigmaNormalizeImage(InputIterator first,
+                            InputIterator last,
+                            MaskIterator first_mask,
+                            double sigma,
+                            OutputIterator dest_first)
+  {
+    const auto minVal = -sigma;
+    const auto maxVal = sigma;
+
+    auto maskIt = first_mask;
+    transform_if(first, last, dest_first, [minVal, maxVal](auto val){return (val-minVal)/(maxVal-minVal);}, [&maskIt](auto) { return *maskIt++ > 0; });
+
+    // maskIt = first_mask;
+    // transform_if(
+    //   first,
+    //   last,
+    //   dest_first,
+    //   [minVal, maxVal](auto val)
+    //   {
+    //     if (val > maxVal)
+    //       return maxVal;
+    //     if (val < minVal)
+    //       return minVal;
+    //     return val;
+    //   },
+    //   [&maskIt](auto) { return *maskIt++ > 0; });
+  }
+
   struct BinaryDataAccessHelper
   {
     unsigned dataOffset;
@@ -602,6 +632,12 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
     case m2::ImageNormalizationStrategyType::MinMax:
     {
       MinMaxNormalizeImage(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), imageAccess.GetData());
+      break;
+    }
+    case m2::ImageNormalizationStrategyType::zScore2Sigma:
+    {
+      StandardizeImage(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), imageAccess.GetData()); 
+      SigmaNormalizeImage(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), 2, imageAccess.GetData());
       break;
     }
     case m2::ImageNormalizationStrategyType::None:
