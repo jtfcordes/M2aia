@@ -27,6 +27,7 @@ found in the LICENSE file.
 #include <m2TSNEImageFilter.h>
 #include <m2ImzMLImageIO.h>
 #include <m2SpectrumImageHelper.h>
+#include <m2KMeansImageFilter.h>
 
 // mitk
 #include <mitkDockerHelper.h>
@@ -118,95 +119,7 @@ void QmitkDataCompressionView::CreateQtPartControl(QWidget *parent)
 void QmitkDataCompressionView::SetFocus() {}
 
   
-// Function to calculate Euclidean distance between two points
-double euclideanDistance(const Eigen::VectorXd& point1, const Eigen::VectorXd& point2) {
-    return (point1 - point2).norm();
-}
 
-
-void QmitkDataCompressionView::DoKMeans(const Eigen::MatrixXd& data, int k, std::vector<int>& clusterAssignments){
-    // Randomly initialize centroids
-    std::vector<Eigen::VectorXd> centroids(k);
-    for (int i = 0; i < k; ++i) {
-        centroids[i] = data.row(rand() % data.rows());
-    }
-
-    bool centroidsChanged = true;
-    while (centroidsChanged) {
-        centroidsChanged = false;
-
-        // Assign each point to the nearest centroid
-#pragma omp parallel for
-        for (int i = 0; i < data.rows(); ++i) {
-            double minDistance = std::numeric_limits<double>::max();
-            int closestCentroid = -1;
-            for (int j = 0; j < k; ++j) {
-                double distance = euclideanDistance(data.row(i), centroids[j]);
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestCentroid = j;
-                }
-            }
-#pragma omp critical
-            {
-                if (clusterAssignments[i] != closestCentroid) {
-                    clusterAssignments[i] = closestCentroid;
-                    centroidsChanged = true;
-                }
-            }
-        }
-
-        // Update centroids
-#pragma omp parallel for
-        for (int i = 0; i < k; ++i) {
-            Eigen::VectorXd newCentroid = Eigen::VectorXd::Zero(data.cols());
-            int count = 0;
-            for (int j = 0; j < data.rows(); ++j) {
-                if (clusterAssignments[j] == i) {
-                    newCentroid += data.row(j);
-                    count++;
-                }
-            }
-            if (count > 0) {
-                newCentroid /= count;
-            }
-#pragma omp critical
-            {
-                centroids[i] = newCentroid;
-            }
-        }
-    }
-}
-
-// void QmitkDataCompressionView::DoKMeans(unsigned int numberOfClasses){
-
-//   using PixelType = float;
-//   constexpr unsigned int Dimension = 3;
-//   using ImageType = itk::VectorImage<PixelType, Dimension>;
-
-  
-//   using EstimatorType = itk::ImageKmeansModelEstimator<ImageType>;
-//   EstimatorType::Pointer estimator = EstimatorType::New();
-//   estimator->SetInputImage(inputImage);
-//   estimator->SetNumberOfClasses(numberOfClasses);
-
-//     try {
-//         estimator->Update();
-//     } catch (itk::ExceptionObject & error) {
-//         std::cerr << "Error: " << error << std::endl;
-//         return EXIT_FAILURE;
-//     }
-
-//     // Assign labels to each pixel
-//     using LabelImageType = itk::Image<unsigned char, Dimension>;
-//     using AssignFilterType = itk::KmeansModelEstimator<ImageType>::AssignLabelsFilterType;
-//     AssignFilterType::Pointer assignFilter = AssignFilterType::New();
-//     assignFilter->SetInputImage(inputImage);
-//     assignFilter->SetModelEstimator(estimator);
-//     assignFilter->Update();
-
-//     LabelImageType::Pointer labeledImage = assignFilter->GetOutput();
-// }
 
 
 void QmitkDataCompressionView::OnStartKMeans()
@@ -215,104 +128,22 @@ void QmitkDataCompressionView::OnStartKMeans()
   {
     for (auto vectorNode : m_Controls.peakListSelection->GetSelectedNodesStdVector())
     {
-      auto image = dynamic_cast<const m2::SpectrumImage *>(imageNode->GetData());
+      auto image = dynamic_cast<m2::ImzMLSpectrumImage *>(imageNode->GetData());
       if (!image->GetImageAccessInitialized())
         return;
 
       auto vector = dynamic_cast<m2::IntervalVector *>(vectorNode->GetData());
-      const auto &intervals = vector->GetIntervals();
-
-      itk::Image<double, 3>::Pointer itkImage;
-      mitk::CastToItkImage(image, itkImage);
-      unsigned int N = image->GetDimension(0) * image->GetDimension(1) * image->GetDimension(2);
-
-      // std::vector<mitk::Image::Pointer> temporaryImages;
-      // auto inputImage = itk::Image<m2::DisplayImagePixelType, 3>::New();
-      // auto region = itkImage->GetLargestPossibleRegion();
-      // region.SetSize(2, intervals.size());
-      // inputImage->SetRegions(region);
-      // inputImage->Allocate();
-
-
-
-      auto progressBar = mitk::ProgressBar::GetInstance();
-
-      auto m = image->GetMaskImage();
-      mitk::ImagePixelReadAccessor<mitk::LabelSetImage::PixelType, 3> maskAcc(m);
-      auto validPixel = std::accumulate(maskAcc.GetData(), maskAcc.GetData() + N, 0);
-
-      Eigen::MatrixXd data(validPixel, intervals.size());
-      MITK_INFO << validPixel << " " << data.cols() << " " << data.rows();
-
-      {
-        auto ionImage = mitk::Image::New();
-        ionImage->Initialize(image);
-
-        progressBar->AddStepsToDo(intervals.size() + 1);
-        for (size_t row = 0; row < intervals.size(); ++row)
-        {
-          progressBar->Progress();
-          const auto mz = intervals.at(row).x.mean();
-          
-          image->GetImage(mz, image->ApplyTolerance(mz), image->GetMaskImage(), ionImage);
-          mitk::ImagePixelReadAccessor<m2::DisplayImagePixelType, 3> acc(ionImage);
-          // std::copy(acc.GetData(), acc.GetData() + N, inputImage->GetBufferPointer() + row * N);
-
-          unsigned v = 0;
-          for(unsigned long i = 0; i < N; ++i)
-          {
-            if( maskAcc.GetData()[i] != 0){
-              data(v, row) = acc.GetData()[i];
-              ++v;
-            }
-          }
-        }
-      }
-
-      // auto result = mitk::Image::New();
-      // mitk::CastToMitkImage(inputImage, result);
-
-      // mitk::DataNode::Pointer node = mitk::DataNode::New();
-      // node->SetData(result);
-      // node->SetName("VectorImage");
-      // this->GetDataStorage()->Add(node);
-  
-
-
-      std::vector<int> clusterAssignments(data.rows(), -1);
-      DoKMeans(data, m_Controls.kmeans_clusters->value(), clusterAssignments);
-      for (int i = 0; i < data.rows(); ++i) {
-        std::cout << "Data point " << i << " assigned to cluster " << clusterAssignments[i] << std::endl;
-      }
-      
-      auto clusteredImage = mitk::LabelSetImage::New();
-      clusteredImage->Initialize(m);
-      // clusteredImage->GetActiveLabelSet();
-      // auto labelset = clusteredImage->GetActiveLabelSet();
-      for(int i = 0; i < m_Controls.kmeans_clusters->value(); ++i){
-        mitk::Label::Pointer label = mitk::Label::New();
-        label->SetName("Cluster " + std::to_string(i));
-        label->SetValue(i);
-        label->SetOpacity(0.5);
-        label->SetColor(m2::RandomColor());
-        clusteredImage->AddLabel(label,0);
-      }
-      
-      {
-        mitk::ImagePixelWriteAccessor<mitk::LabelSetImage::PixelType, 3> c_acc(clusteredImage);
-
-        unsigned long v = 0;
-        for(unsigned long i = 0; i < N; ++i)
-        {
-          if( maskAcc.GetData()[i] != 0){
-            c_acc.GetData()[i] = clusterAssignments[v];
-            ++v;
-          }
-        }
-      }
+      if (!vector)
+        return;
+        
+      m2::KMeansImageFilter::Pointer filter = m2::KMeansImageFilter::New();
+      filter->SetInput(image);
+      filter->SetIntervals(vector->GetIntervals());
+      filter->SetNumberOfClusters(m_Controls.kmeans_clusters->value());
+      filter->GenerateData();
 
       mitk::DataNode::Pointer node2 = mitk::DataNode::New();
-      node2->SetData(clusteredImage);
+      node2->SetData(filter->GetOutput(0));
       node2->SetName("ClusteredImage");
       this->GetDataStorage()->Add(node2);
 

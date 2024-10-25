@@ -3,9 +3,9 @@ set(H_FILES
   include/m2MassSpecVisualizationFilter.h
   include/m2PcaImageFilter.h
   include/m2TSNEImageFilter.h
-  include/m2KmeanFilter.h
   include/m2MultiSliceFilter.h
   include/m2RGBColorMixer.hpp
+  include/m2KMeansImageFilter.h
   
   include/tsne/sptree.h
   include/tsne/vptree.h
@@ -17,9 +17,9 @@ set(CPP_FILES
   tsne.cpp
   m2MassSpecVisualizationFilter.cpp
   m2MultiSliceFilter.cpp
-  m2KmeanFilter.cpp
   m2PcaImageFilter.cpp
   m2TSNEImageFilter.cpp
+  m2KMeansImageFilter.cpp
 )
 
 set(RESOURCE_FILES)

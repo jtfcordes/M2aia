@@ -35,8 +35,7 @@ private slots:
   void OnStartPCA();
   void OnStartTSNE();
   void OnStartKMeans();
-  void DoKMeans(const Eigen::MatrixXd& data, int k, std::vector<int>& clusterAssignments);
-
+  
 
 private:
   mitk::Image::Pointer ResampleVectorImage(mitk::Image::Pointer lowResImage, mitk::Image::Pointer referenceImage);
