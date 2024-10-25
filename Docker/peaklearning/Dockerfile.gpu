@@ -1,4 +1,4 @@
-FROM ghcr.io/m2aia/pym2aia/cuda:11.8.0-ubuntu22.04 as system
+FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04 as system
 
 
 # system container dependencies

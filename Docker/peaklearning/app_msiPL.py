@@ -92,42 +92,56 @@ I.SetBaselineCorrection(args.baseline_correction, args.baseline_correction_value
 I.SetNormalization(args.normalization)
 I.SetPooling(args.range_pooling)
 I.SetIntensityTransformation(args.intensity_transform)
+I.SetTolerance(args.tolerance)
 I.Load()
 
-# initialize model
-vae = VAE_BN(I.GetXAxisDepth(), interim_dim, latent_dim)
-myModel, encoder = vae.get_architecture()
 
 # check for existing model parameters
 file_name = Path(file_path).name
 
-dataset = m2.Dataset.SpectrumDataset([I])
+print(mask.shape, (mask == 1).shape)
+print(np.unique(mask))
 
-gen = BatchSequence(dataset, batch_size=batch_size, shuffle=True)
-history = myModel.fit(gen, epochs=epochs)
-myModel.save_weights(model_path)
+for label in np.unique(mask):
+    if label == 0: 
+        continue
+    
+    # initialize model
+    vae = VAE_BN(I.GetXAxisDepth(), interim_dim, latent_dim)
+    myModel, encoder = vae.get_architecture()
+    
+    print(f"Training model for label {label}...")
+    print(f"Model will be saved at {model_path}")
+    print("Samples in mask:", np.sum(mask == label))
 
-# init running variance
-count = 0
-mean = np.zeros_like(I.GetXAxis())
-deltaM2  = np.zeros_like(I.GetXAxis())
-existingAggregate = (count, mean, deltaM2)
+    dataset = m2.Dataset.SpectrumDataset([I],sampling_masks=[mask == label])
+    gen = BatchSequence(dataset, batch_size=batch_size, shuffle=True)
+    history = myModel.fit(gen, epochs=epochs)
+    myModel.save_weights(model_path)
 
-# update running variance
-for i in range(I.GetNumberOfSpectra()):
-    xs, ys = I.GetSpectrum(i)
-    existingAggregate = running_variance_update(existingAggregate, ys)
+    # init running variance
+    count = 0
+    mean = np.zeros_like(I.GetXAxis())
+    deltaM2  = np.zeros_like(I.GetXAxis())
+    existingAggregate = (count, mean, deltaM2)
 
-_, var, _ = running_variance_finalize(existingAggregate)
+    # update running variance
+    for i in range(I.GetNumberOfSpectra()):
+        xs, ys = I.GetSpectrum(i)
+        existingAggregate = running_variance_update(existingAggregate, ys)
 
-# evaluate encoder weights and find peaks
-W_enc = encoder.get_weights()
-_, _, _, learned_peaks = LearnPeaks(I.GetXAxis(), W_enc, np.sqrt(var), latent_dim, beta, I.GetMeanSpectrum())
+    _, var, _ = running_variance_finalize(existingAggregate)
 
-# write as csv
-xs = I.GetXAxis()
-ys = I.GetMeanSpectrum()
-with open(args.csv, 'w') as f:
-    f.write('mz,intensity\n')
-    for id in learned_peaks:
-        f.write(f'{xs[id]},{ys[id]}\n')
+    # evaluate encoder weights and find peaks
+    W_enc = encoder.get_weights()
+    _, _, _, learned_peaks = LearnPeaks(I.GetXAxis(), W_enc, np.sqrt(var), latent_dim, beta, I.GetMeanSpectrum())
+
+    # write as csv
+    xs = I.GetXAxis()
+    ys = I.GetMeanSpectrum()
+    name = args.csv.split('.')[0] + "_" + str(label) + ".csv"
+
+    with open(name, 'w') as f:
+        f.write('mz,intensity\n')
+        for id in learned_peaks:
+            f.write(f'{xs[id]},{ys[id]}\n')
