@@ -13,6 +13,7 @@ org.mitk.gui.qt.m2.reconstruction3D:ON
 
 org.mitk.gui.qt.m2.docker.molecular:ON
 org.mitk.gui.qt.m2.docker.peaklearning:ON
+org.mitk.gui.qt.m2.docker.sklearn:ON
 org.mitk.gui.qt.m2.docker.simclr:ON
 org.mitk.gui.qt.m2.docker.umap:ON
 )
