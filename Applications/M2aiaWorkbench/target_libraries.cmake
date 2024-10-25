@@ -12,13 +12,13 @@ set(target_libraries
   org_mitk_gui_qt_volumevisualization
   org_mitk_gui_qt_pointsetinteraction
   org_mitk_gui_qt_mitkworkbench_intro
-  org_mitk_gui_qt_imagenavigator
+  # org_mitk_gui_qt_imagenavigator
   org_mitk_gui_qt_moviemaker
   org_mitk_gui_qt_basicimageprocessing
   org_mitk_gui_qt_properties
   org_mitk_gui_qt_viewnavigator
   org_mitk_gui_qt_renderwindowmanager
-  org_mitk_gui_qt_geometrytools
+  # org_mitk_gui_qt_geometrytools
   org_mitk_gui_qt_preprocessing_resampling
   org_mitk_gui_qt_m2_application
   org_mitk_gui_qt_m2_common

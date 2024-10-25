@@ -57,7 +57,7 @@ set(CPP_FILES
   m2SubdivideImage2DFilter.cpp
   m2SpectrumImageDataInteractor.cpp
   m2IntervalVector.cpp
-m2ShiftMapImageFilter.cpp
+  m2ShiftMapImageFilter.cpp
   
   IO/m2ImzMLParser.cpp
   IO/m2ImzMLImageIO.cpp

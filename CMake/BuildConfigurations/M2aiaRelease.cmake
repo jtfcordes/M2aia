@@ -13,13 +13,13 @@ set(MITK_CONFIG_PLUGINS
   org.mitk.gui.qt.segmentation
   org.mitk.gui.qt.volumevisualization
   org.mitk.gui.qt.pointsetinteraction
-  org.mitk.gui.qt.imagenavigator
+  # org.mitk.gui.qt.imagenavigator
   org.mitk.gui.qt.moviemaker
   org.mitk.gui.qt.properties
   org.mitk.gui.qt.viewnavigator
   org.mitk.gui.qt.renderwindowmanager
   org.mitk.gui.qt.multilabelsegmentation
-  org.mitk.gui.qt.geometrytools
+  # org.mitk.gui.qt.geometrytools
   org.mitk.gui.qt.m2.application
   org.mitk.gui.qt.m2.common
   org.mitk.gui.qt.m2.data
