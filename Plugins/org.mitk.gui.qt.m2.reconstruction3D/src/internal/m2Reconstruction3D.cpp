@@ -21,6 +21,7 @@ See LICENSE.txt or https://www.github.com/jtfcordes/m2aia for details.
 
 // Qt
 #include <QMessageBox>
+#include <QThreadPool>
 
 // mitk
 #include <mitkNodePredicateDataType.h>
@@ -28,11 +29,11 @@ See LICENSE.txt or https://www.github.com/jtfcordes/m2aia for details.
 
 // m2aia
 #include "m2Reconstruction3D.h"
+#include <m2DataNodePredicates.h>
 #include <m2ElxRegistrationHelper.h>
 #include <m2ElxUtil.h>
 #include <m2ImzMLSpectrumImage.h>
 #include <m2NameDialog.h>
-#include <m2DataNodePredicates.h>
 
 const std::string m2Reconstruction3D::VIEW_ID = "org.mitk.views.m2.reconstruction3D";
 
@@ -47,10 +48,10 @@ void m2Reconstruction3D::CreateQtPartControl(QWidget *parent)
   m_Controls.centroidListSelector->SetAutoSelectNewNodes(true);
   m_Controls.centroidListSelector->SetEmptyInfo(QString("Centroid Spectrum"));
   m_Controls.centroidListSelector->SetPopUpTitel(QString("Centroid Spectrum"));
-  m_Controls.centroidListSelector->SetNodePredicate(mitk::NodePredicateAnd::New(
-    m2::DataNodePredicates::NoActiveHelper, 
-    m2::DataNodePredicates::IsOverviewSpectrum, 
-    m2::DataNodePredicates::IsCentroidSpectrum));
+  m_Controls.centroidListSelector->SetNodePredicate(
+    mitk::NodePredicateAnd::New(m2::DataNodePredicates::NoActiveHelper,
+                                m2::DataNodePredicates::IsOverviewSpectrum,
+                                m2::DataNodePredicates::IsCentroidSpectrum));
 
   connect(m_Controls.btnUpdateList, &QPushButton::clicked, this, &m2Reconstruction3D::OnUpdateList);
 
@@ -79,25 +80,37 @@ void m2Reconstruction3D::CreateQtPartControl(QWidget *parent)
     m_List2->setSortingEnabled(true);
   }
 
-  connect(m_Controls.btnRemove,&QAbstractButton::clicked, this, [this](){
-    for(auto item : m_List1->selectedItems()){
-      delete m_List1->takeItem(m_List1->row(item));
-    }
+  connect(m_Controls.btnRemove,
+          &QAbstractButton::clicked,
+          this,
+          [this]()
+          {
+            for (auto item : m_List1->selectedItems())
+            {
+              delete m_List1->takeItem(m_List1->row(item));
+            }
 
-    for(auto item : m_List2->selectedItems()){
-      delete m_List2->takeItem(m_List2->row(item));
-    }
-  });
-  
-  connect(m_Controls.btnSwitch,&QAbstractButton::clicked, this, [this](){
-    for(auto item : m_List1->selectedItems()){
-      m_List2->addItem(m_List1->takeItem(m_List1->row(item)));
-    }
+            for (auto item : m_List2->selectedItems())
+            {
+              delete m_List2->takeItem(m_List2->row(item));
+            }
+          });
 
-    for(auto item : m_List2->selectedItems()){
-      m_List1->addItem(m_List2->takeItem(m_List2->row(item)));
-    }
-  });
+  connect(m_Controls.btnSwitch,
+          &QAbstractButton::clicked,
+          this,
+          [this]()
+          {
+            for (auto item : m_List1->selectedItems())
+            {
+              m_List2->addItem(m_List1->takeItem(m_List1->row(item)));
+            }
+
+            for (auto item : m_List2->selectedItems())
+            {
+              m_List1->addItem(m_List2->takeItem(m_List2->row(item)));
+            }
+          });
 }
 
 m2Reconstruction3D::DataTuple m2Reconstruction3D::GetImageDataById(unsigned int id, QListWidget *listWidget)
@@ -150,7 +163,7 @@ void m2Reconstruction3D::OnStartStacking()
   // check input data
   const auto numItems = m_List1->count();
   const bool doMultiModalImageRegistration = m_List1->count() == m_List2->count();
-  
+
   if (!numItems)
   {
     QMessageBox::warning(m_Parent, "No data available!", "The list for 3D reconstruction must not be empty!");
@@ -160,7 +173,8 @@ void m2Reconstruction3D::OnStartStacking()
   // name of the result stack
   std::array<std::string, 2> stackNames;
   std::array<QListWidget *, 2> lists = {m_List1, m_List2};
-  for(int i = 0 ; i <  1 + doMultiModalImageRegistration; ++i){
+  for (int i = 0; i < 1 + doMultiModalImageRegistration; ++i)
+  {
     auto d = GetImageDataById(0, lists[i]);
 
     m2NameDialog dialog(m_Parent);
@@ -182,10 +196,8 @@ void m2Reconstruction3D::OnStartStacking()
   auto stackSize = m_List1->count();
   double spacingZ = m2::MicroMeterToMilliMeter(m_Controls.spinBoxZSpacing->value());
   // prepare stacks
-  auto spectrumImageStack1 =
-    m2::SpectrumImageStack::New(stackSize, spacingZ);
-  auto spectrumImageStack2 =
-    m2::SpectrumImageStack::New(stackSize, spacingZ);
+  auto spectrumImageStack1 = m2::SpectrumImageStack::New(stackSize, spacingZ);
+  auto spectrumImageStack2 = m2::SpectrumImageStack::New(stackSize, spacingZ);
   /*
    * Two modalities
    * M2 is optional
@@ -206,7 +218,7 @@ void m2Reconstruction3D::OnStartStacking()
 
   // prepare workbench
   mitk::ProgressBar::GetInstance()->AddStepsToDo(numItems - 1);
-  
+
   const bool UseSubsequentOrdering = !m_Controls.chkBxCoRegistrationToSelected->isChecked();
   const auto currentRow = m_List1->currentRow() < 0 ? numItems / 2 : m_List1->currentRow();
 
@@ -221,43 +233,61 @@ void m2Reconstruction3D::OnStartStacking()
   }
 
   // Initialize stack 2
-  if(doMultiModalImageRegistration){
+  if (doMultiModalImageRegistration)
+  {
     auto elxHelper = RegistrationStep(currentRow, m_List1, nullptr, currentRow, m_List2);
     spectrumImageStack2->Insert(currentRow, elxHelper);
     mitk::ProgressBar::GetInstance()->Progress();
   }
 
-  for (int movingId = currentRow - 1; movingId >= 0; --movingId)
-  {
-    // stack 1
-    int fixedId = UseSubsequentOrdering ? movingId + 1 : currentRow;
-    auto fixedTransformer = spectrumImageStack1->GetSliceTransformers().at(fixedId);
-    auto elxHelper = RegistrationStep(fixedId, m_List1, fixedTransformer, movingId, m_List1);
-    spectrumImageStack1->Insert(movingId, elxHelper);
+  QThreadPool::globalInstance()->start(
+    [&]()
+    {
+      QThreadPool::globalInstance()->start(
+        [&]()
+        {
+          for (int movingId = currentRow - 1; movingId >= 0; --movingId)
+          {
+            // stack 1
+            int fixedId = UseSubsequentOrdering ? movingId + 1 : currentRow;
+            auto fixedTransformer = spectrumImageStack1->GetSliceTransformers().at(fixedId);
+            auto elxHelper = RegistrationStep(fixedId, m_List1, fixedTransformer, movingId, m_List1);
+            spectrumImageStack1->Insert(movingId, elxHelper);
 
-    // stack 2
-    if(doMultiModalImageRegistration){
-      elxHelper = RegistrationStep(movingId, m_List1, elxHelper, movingId, m_List2);
-      spectrumImageStack2->Insert(movingId, elxHelper);
-    }
-    mitk::ProgressBar::GetInstance()->Progress();
-  }
+            // stack 2
+            if (doMultiModalImageRegistration)
+            {
+              elxHelper = RegistrationStep(movingId, m_List1, elxHelper, movingId, m_List2);
+              spectrumImageStack2->Insert(movingId, elxHelper);
+            }
+            mitk::ProgressBar::GetInstance()->Progress();
+          }
+        });
 
-  for (int movingId = currentRow + 1; movingId < numItems; ++movingId)
-  {
-    // stack 1
-    int fixedId = UseSubsequentOrdering ? movingId - 1 : currentRow;
-    auto fixedTransformer = spectrumImageStack1->GetSliceTransformers().at(fixedId);
-    auto elxHelper = RegistrationStep(fixedId, m_List1, fixedTransformer, movingId, m_List1);
-    spectrumImageStack1->Insert(movingId, elxHelper);
+      QThreadPool::globalInstance()->start(
+        [&]()
+        {
+          for (int movingId = currentRow + 1; movingId < numItems; ++movingId)
+          {
+            // stack 1
+            int fixedId = UseSubsequentOrdering ? movingId - 1 : currentRow;
+            auto fixedTransformer = spectrumImageStack1->GetSliceTransformers().at(fixedId);
+            auto elxHelper = RegistrationStep(fixedId, m_List1, fixedTransformer, movingId, m_List1);
+            spectrumImageStack1->Insert(movingId, elxHelper);
 
-    // stack 2
-    if(doMultiModalImageRegistration){
-      elxHelper = RegistrationStep(movingId, m_List1, elxHelper, movingId, m_List2);
-      spectrumImageStack2->Insert(movingId, elxHelper);
-    }
-    mitk::ProgressBar::GetInstance()->Progress();
-  }
+            // stack 2
+            if (doMultiModalImageRegistration)
+            {
+              elxHelper = RegistrationStep(movingId, m_List1, elxHelper, movingId, m_List2);
+              spectrumImageStack2->Insert(movingId, elxHelper);
+            }
+            mitk::ProgressBar::GetInstance()->Progress();
+          }
+        });
+
+    });
+
+  QThreadPool::globalInstance()->waitForDone();
 
   spectrumImageStack1->InitializeProcessor();
   spectrumImageStack1->InitializeGeometry();
@@ -266,8 +296,9 @@ void m2Reconstruction3D::OnStartStacking()
   node->SetData(spectrumImageStack1);
   node->SetName(stackNames[0]);
   GetDataStorage()->Add(node);
-  
-  if(doMultiModalImageRegistration){
+
+  if (doMultiModalImageRegistration)
+  {
     spectrumImageStack2->InitializeProcessor();
     spectrumImageStack2->InitializeGeometry();
 
