@@ -56,7 +56,7 @@ namespace m2
         ++oit;
       }
 
-      delete nodes;
+      delete[] nodes;
     }
   protected:
     typedef struct MedfiltNode
