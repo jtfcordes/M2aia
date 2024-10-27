@@ -1,6 +1,6 @@
 set(MITK_CONFIG_PACKAGES
   MatchPoint
-  Qt5
+  Qt6
   BLUEBERRY
 )
 
