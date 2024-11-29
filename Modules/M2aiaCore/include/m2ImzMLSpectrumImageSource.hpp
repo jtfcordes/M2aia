@@ -102,40 +102,159 @@ namespace m2
       return std::make_pair(min_value, max_value);
   }
 
+  template <typename InputIterator, typename MaskIterator>
+  double Mean(InputIterator first,
+                          InputIterator last,
+                          MaskIterator first_mask)
+  {
+    auto maskIt = first_mask;
+    double N = accumulate_if(
+      first, last, 0, [](auto s, auto) -> int { return s + 1; }, [&maskIt](auto) { return *maskIt++ > 0; });
+    
+    maskIt = first_mask;
+    double sum = accumulate_if(first, last, 0.0, std::plus<>(), [&maskIt](auto) { return *maskIt++ > 0; });
+    auto mean = sum / N;
+    return mean;
+  }
 
-
-  template <typename InputIterator, typename MaskIterator, typename OutputIterator>
-  void StandardizeImage(InputIterator first,
-                                  InputIterator last,
-                                  MaskIterator first_mask,
-                                  OutputIterator dest_first)
+  template <typename InputIterator, typename MaskIterator>
+  double StdDev(InputIterator first,
+                          InputIterator last,
+                          MaskIterator first_mask,
+                          double mean)
   {
     auto maskIt = first_mask;
     double N = accumulate_if(
       first, last, 0, [](auto s, auto) -> int { return s + 1; }, [&maskIt](auto) { return *maskIt++ > 0; });
 
-    double sum = accumulate_if(first, last, 0.0, std::plus<>(), [&maskIt](auto) { return *maskIt++ > 0; });
-    auto mean = sum / N;
-
-    // reset mask iterator
+    if(N<=0) MITK_ERROR << " No N Detected";
     maskIt = first_mask;
-    sum = accumulate_if(
+    auto sum = accumulate_if(
       first,
       last,
       0.0,
       [mean](auto s, auto val) { return s + std::pow(val - mean, 2); },
       [&maskIt](auto) { return *maskIt++ > 0; });
     auto stddev = std::sqrt(sum / N);
+    if(stddev<=0) MITK_ERROR << " stddev defect";
+    return stddev;
+  }
 
-    // reset mask iterator
-    maskIt = first_mask;
+  template <typename InputIterator, typename MaskIterator, typename OutputIterator>
+  void ApplyScore(InputIterator first,
+                  InputIterator last,
+                  MaskIterator first_mask,
+                  OutputIterator dest_first,
+                  double mu,
+                  double sigma){
+    auto maskIt = first_mask;
     transform_if(
       first,
       last,
       dest_first,
-      [mean, stddev](auto val) { return (val - mean) / stddev; },
+      [mu, sigma](auto val) { return (val - mu) / sigma; },
       [&maskIt](auto) { return *maskIt++ > 0; });
+  }
+
+template <typename InputIterator, typename MaskIterator>
+double Median(InputIterator first,
+              InputIterator last,
+              MaskIterator first_mask
+              )
+{
+      
+      std::vector<double> intsCpy;
+      auto maskIt = first_mask;
+      std::copy_if(first, last, std::back_inserter(intsCpy), [&maskIt](auto) { return *maskIt++ > 0; });
+      auto n = intsCpy.size();
+      auto mid = n / 2;
+      std::nth_element(intsCpy.begin(), intsCpy.begin() + mid, intsCpy.end());
+      auto median = intsCpy[mid];
+      if (n % 2 == 0)
+      {
+        std::nth_element(intsCpy.begin(), intsCpy.begin() + mid - 1, intsCpy.end());
+        median = (median + intsCpy[mid - 1]) / 2.0;
+      }
+      return median;
+    }  
+
+    template <typename InputIterator, typename MaskIterator>
+double MedianAbsoluteDeviation(InputIterator first,
+                                InputIterator last,
+                                MaskIterator first_mask,
+                                const double constant = 1.4826)
+    {
+      std::vector<double> intsCpy;
+      auto maskIt = first_mask;
+      auto median = Median(first, last, maskIt);
+            
+      std::vector<double> absDiffOfMedian;
+      maskIt = first_mask;
+      transform_if(first, last, std::back_inserter(absDiffOfMedian), [median](auto val){return std::abs(val - median);}, [&maskIt](auto) { return *maskIt++ > 0; });
+      
+      auto absDiffMedian = Median(absDiffOfMedian.begin(), absDiffOfMedian.end(), absDiffOfMedian.begin());
+      return constant * absDiffMedian;
+    }          
+
+template <typename InputIterator, typename MaskIterator, typename OutputIterator>
+  void RobustStandardizeImage(InputIterator first,
+                                  InputIterator last,
+                                  MaskIterator first_mask,
+                                  OutputIterator dest_first)
+  {
+    auto maskIt = first_mask;
+    auto median = Median(first, last, maskIt);
+    
+    maskIt = first_mask;
+    auto mad = MedianAbsoluteDeviation(first, last, maskIt, median);
+    
+    maskIt = first_mask;
+    ApplyScore(first, last, maskIt, dest_first, median, mad);
+  }
+                
+
+
   
+  template <typename InputIterator, typename MaskIterator, typename OutputIterator>
+  void StandardizeImage(InputIterator first,
+                                  InputIterator last,
+                                  MaskIterator first_mask,
+                                  OutputIterator dest_first)
+  {  
+    auto maskIt = first_mask;
+    double mean = Mean(first, last, maskIt);
+    maskIt = first_mask;
+    double stddev = StdDev(first, last, maskIt, mean);
+    maskIt = first_mask;
+    ApplyScore(first, last, maskIt, dest_first, mean, stddev);
+  }
+
+  template <typename InputIterator, typename MaskIterator, typename OutputIterator>
+  void ParetoScaling(InputIterator first,
+                                  InputIterator last,
+                                  MaskIterator first_mask,
+                                  OutputIterator dest_first)
+  {  
+    auto maskIt = first_mask;
+    double mean = Mean(first, last, maskIt);
+    maskIt = first_mask;
+    double stddev = StdDev(first, last, maskIt, mean);
+    maskIt = first_mask;
+    ApplyScore(first, last, maskIt, dest_first, mean, std::sqrt(stddev));
+  }
+
+  template <typename InputIterator, typename MaskIterator, typename OutputIterator>
+  void VastScaling(InputIterator first,
+                    InputIterator last,
+                    MaskIterator first_mask,
+                    OutputIterator dest_first)
+  {  
+    auto maskIt = first_mask;
+    double mean = Mean(first, last, maskIt);
+    maskIt = first_mask;
+    double stddev = StdDev(first, last, maskIt, mean);
+    maskIt = first_mask;
+    ApplyScore(first, last, maskIt, dest_first, mean, stddev/mean);
   }
 
 
@@ -157,32 +276,22 @@ namespace m2
 
 
   template <typename InputIterator, typename MaskIterator, typename OutputIterator>
-  void SigmaNormalizeImage(InputIterator first,
-                            InputIterator last,
-                            MaskIterator first_mask,
-                            double sigma,
-                            OutputIterator dest_first)
-  {
-    const auto minVal = -sigma;
-    const auto maxVal = sigma;
-
+  void RangeScaling(InputIterator first,
+                    InputIterator last,
+                    MaskIterator first_mask,
+                    OutputIterator dest_first)
+  {  
     auto maskIt = first_mask;
-    transform_if(first, last, dest_first, [minVal, maxVal](auto val){return (val-minVal)/(maxVal-minVal);}, [&maskIt](auto) { return *maskIt++ > 0; });
+    const auto minMax = minmax_if(first, last, [&maskIt](auto) { return *maskIt++ > 0; });
+    const auto minVal = minMax.first;
+    const auto maxVal = minMax.second;
 
-    // maskIt = first_mask;
-    // transform_if(
-    //   first,
-    //   last,
-    //   dest_first,
-    //   [minVal, maxVal](auto val)
-    //   {
-    //     if (val > maxVal)
-    //       return maxVal;
-    //     if (val < minVal)
-    //       return minVal;
-    //     return val;
-    //   },
-    //   [&maskIt](auto) { return *maskIt++ > 0; });
+    
+    maskIt = first_mask;
+    double mean = Mean(first, last, maskIt);
+    
+    maskIt = first_mask;
+    ApplyScore(first, last, maskIt, dest_first, mean, maxVal - minVal);
   }
 
   struct BinaryDataAccessHelper
@@ -220,6 +329,7 @@ namespace m2
     // 2) Subrange from '(' to ')' with center 'c', offset left '>' and offset right '<'
     // |>>>>>>>>>>>>>>>(********c********)<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<|
     auto subRes = m2::Signal::Subrange(xs, xRangeCenter - xRangeTol, xRangeCenter + xRangeTol);
+    // MITK_INFO << "(GetBinaryDataAccessHelper) [subRes.first]" << subRes.first << " [subRes.second]" << subRes.second;
 
     m2::BinaryDataAccessHelper offsetHelper;
     offsetHelper.dataOffset = subRes.first;
@@ -388,6 +498,7 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeNormal
 {
   // initialize the normalization iamge
   auto image = p->GetNormalizationImage(type);
+  // MITK_INFO << to_underlying(type);
 
   // create a write accessor
   using WriteAccessorType = mitk::ImagePixelWriteAccessor<NormImagePixelType, 3>;
@@ -584,6 +695,10 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
         std::ifstream f(p->GetBinaryDataPath(), std::iostream::binary);
         std::vector<IntensityType> ints;
         std::vector<MassAxisType> mzs;
+        std::copy(p->GetXAxis().begin(),p->GetXAxis().end(), std::back_inserter(mzs));
+        auto binaryDataAccessHelper = GetBinaryDataAccessHelper<MassAxisType>(mzs, xRangeCenter, xRangeTol, 0);
+        // MITK_INFO << "BinaryDataAccessHelper: " << binaryDataAccessHelper.dataModifiedLength;
+
         for (unsigned int i = a; i < b; ++i)
         {
           auto &spectrum = spectra[i];
@@ -597,7 +712,9 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
           binaryDataToVector(
             f, spectrum.mzOffset, spectrum.mzLength, mzs.data()); // !! read mass axis for each spectrum
 
-          auto binaryDataAccessHelper = GetBinaryDataAccessHelper<MassAxisType>(mzs, xRangeCenter, xRangeTol, 0);
+          if (any(spectrumType.Format & (m2::SpectrumFormat::ProcessedCentroid | m2::SpectrumFormat::ProcessedProfile)))
+            binaryDataAccessHelper = GetBinaryDataAccessHelper<MassAxisType>(mzs, xRangeCenter, xRangeTol, 0);
+
           ints.resize(binaryDataAccessHelper.dataModifiedLength);
 
           if (binaryDataAccessHelper.dataModifiedLength == 0)
@@ -612,6 +729,11 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
 
           // TODO: Is it useful to normalize centroid data?
           IntensityType norm = normAccess.GetPixelByIndex(spectrum.index);
+          if(norm <= 0 || std::isnan(norm) || std::isinf(norm))
+          {
+            MITK_ERROR << "Normalization factor is invalid: " << norm << " Spectrum-id:" << a;
+            continue;
+          }
           std::transform(std::begin(ints), std::end(ints), std::begin(ints), [&norm](auto &v) { return v / norm; });
 
           auto val =
@@ -634,12 +756,17 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
       MinMaxNormalizeImage(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), imageAccess.GetData());
       break;
     }
-    case m2::ImageNormalizationStrategyType::zScore2Sigma:
+    case m2::ImageNormalizationStrategyType::ParetoScaling:
     {
-      StandardizeImage(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), imageAccess.GetData()); 
-      SigmaNormalizeImage(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), 2, imageAccess.GetData());
+      ParetoScaling(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), imageAccess.GetData()); 
       break;
     }
+    case m2::ImageNormalizationStrategyType::VastScaling:
+      VastScaling(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), imageAccess.GetData()); 
+      break;
+    case m2::ImageNormalizationStrategyType::RangeScaling:
+      RangeScaling(imageAccess.GetData(), imageAccess.GetData()+bufferN, maskAccess->GetData(), imageAccess.GetData()); 
+      break;
     case m2::ImageNormalizationStrategyType::None:
     default:
     {
@@ -690,24 +817,6 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::GetImagePrivate(
       break;
     }
   }
-
-
-  // Reduce noise in the image
-  // Apply median filter to reduce noise in the image
-  using ItkImageType = itk::Image<DisplayImagePixelType, 3>;
-  using MedianFilterType = itk::MedianImageFilter<ItkImageType, ItkImageType>;
-  auto medianFilter = MedianFilterType::New();
-  ItkImageType::Pointer itkImage = ItkImageType::New();
-  mitk::CastToItkImage(destImage->Clone(), itkImage);
-  medianFilter->SetInput(itkImage);
-  MedianFilterType::InputSizeType radius;
-  radius.Fill(1); // Set the radius for the median filter
-  medianFilter->SetRadius(radius);
-  medianFilter->Update();
-
-  // Copy the filtered image back to the destination image
-  auto filteredImage = medianFilter->GetOutput();
-  std::copy(filteredImage->GetBufferPointer(), filteredImage->GetBufferPointer() + bufferN, imageAccess.GetData());
   
  
 }
@@ -789,13 +898,16 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeGeomet
     label->SetLocked(true);
     label->SetValue(1);
     image->AddLabel(label,0);
+
+    mitk::ImagePixelWriteAccessor<mitk::LabelSetImage::PixelType, 3> acc(image);
+    std::memset(acc.GetData(), 0, imageSize[0] * imageSize[1] * imageSize[2] * sizeof(mitk::LabelSetImage::PixelType));
   }else{
     auto image = p->GetMaskImage();
     image->SetProperty("m2aia.mask.initialization", mitk::StringProperty::New("external"));
   }
 
-  auto max_dim0 = p->GetDimensions()[0];
-  auto max_dim1 = p->GetDimensions()[1];
+  // auto max_dim0 = p->GetDimensions()[0];
+  // auto max_dim1 = p->GetDimensions()[1];
   std::vector<std::thread> threads;
 
   for (auto type : m2::NormalizationStrategyTypeList)
@@ -812,20 +924,17 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeGeomet
     p->SetNormalizationImage(normImage, type);
     normImage->InitializeByItk(caster->GetOutput());
 
-    { // scope for the accessor
-      mitk::ImagePixelWriteAccessor<m2::NormImagePixelType, 3> acc(normImage);
-      std::memset(acc.GetData(), 1, imageSize[0] * imageSize[1] * imageSize[2] * sizeof(m2::NormImagePixelType));
-    }
-
+    mitk::ImagePixelWriteAccessor<m2::NormImagePixelType, 3> acc(normImage);
+    std::memset(acc.GetData(), 1, imageSize[0] * imageSize[1] * imageSize[2] * sizeof(m2::NormImagePixelType));
     p->SetNormalizationImageStatus(type, false);
-    // }
+ 
   }
 
-  mitk::ImagePixelWriteAccessor<m2::DisplayImagePixelType, 3> acc(p);
-  acc.SetPixelByIndex({0, 0, 0}, 1);
-  acc.SetPixelByIndex({0, max_dim1 - 1, 0}, max_dim1 / 2);
-  acc.SetPixelByIndex({max_dim0 - 1, 0, 0}, max_dim0 / 2);
-  acc.SetPixelByIndex({max_dim0 - 1, max_dim1 - 1, 0}, max_dim1 + max_dim0);
+  // mitk::ImagePixelWriteAccessor<m2::DisplayImagePixelType, 3> acc(p);
+  // acc.SetPixelByIndex({0, 0, 0}, 1);
+  // acc.SetPixelByIndex({0, max_dim1 - 1, 0}, max_dim1 / 2);
+  // acc.SetPixelByIndex({max_dim0 - 1, 0, 0}, max_dim0 / 2);
+  // acc.SetPixelByIndex({max_dim0 - 1, max_dim1 - 1, 0}, max_dim1 + max_dim0);
 }
 
 template <class MassAxisType, class IntensityType>
