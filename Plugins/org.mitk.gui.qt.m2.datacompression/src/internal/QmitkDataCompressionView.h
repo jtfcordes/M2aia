@@ -35,6 +35,7 @@ private slots:
   void OnStartPCA();
   void OnStartTSNE();
   void OnStartKMeans();
+  void OnSaveDataCompressionResults();
   
 
 private:

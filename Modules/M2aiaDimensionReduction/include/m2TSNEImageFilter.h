@@ -41,6 +41,8 @@ namespace m2
     itkGetMacro(Iterations, unsigned int);
     itkSetMacro(Iterations, unsigned int);
 
+    void SetProgressFunc(std::function<void()> f);
+
   protected:
     itk::DataObject::Pointer MakeOutput(const DataObjectIdentifierType &name);
 
@@ -52,6 +54,7 @@ namespace m2
     unsigned int m_Perplexity = 2;
     unsigned int m_Iterations = 200;
     double m_Theta = 0.5;
+    std::function<void()> m_ProgressFunc;
 
     /*!
     \brief standard constructor

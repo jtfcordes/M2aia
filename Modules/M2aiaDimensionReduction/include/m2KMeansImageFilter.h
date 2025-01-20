@@ -33,9 +33,11 @@ class M2AIADIMENSIONREDUCTION_EXPORT KMeansImageFilter : public itk::Object
 {
 
 private:
+    // Input and output images
+    std::map<int, mitk::Image::Pointer> m_Outputs, m_Inputs;
 
-    std::map<int, mitk::Image::Pointer> m_Outputs;
-    m2::ImzMLSpectrumImage::Pointer m_Input;
+    // stores for each input the valid indices (masked pixels are valid)
+    std::map<int, std::vector<itk::Index<3>>> m_ValidIndicesMap;
 
 public:
     mitkClassMacroItkParent(KMeansImageFilter, itk::Object);
@@ -46,9 +48,9 @@ public:
     itkSetMacro(NumberOfClusters, unsigned int);
     void GenerateData();
     
-    void SetInput(m2::ImzMLSpectrumImage * image)
+    void SetInput(m2::SpectrumImage::Pointer image, int idx = 0)
     {
-        m_Input = image;
+        m_Inputs[idx] = image;
     }
     
     void SetIntervals(std::vector<m2::Interval> intervals){
@@ -63,7 +65,6 @@ public:
             m_Outputs[idx] = mitk::LabelSetImage::New();
         }
         return dynamic_cast<mitk::LabelSetImage*>(m_Outputs[idx].GetPointer());
-         
     }
  
 private:

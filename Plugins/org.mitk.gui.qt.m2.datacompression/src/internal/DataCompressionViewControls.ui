@@ -272,6 +272,13 @@
      </widget>
     </widget>
    </item>
+   <item>
+    <widget class="QCommandLinkButton" name="btnSaveDataCompressionResults">
+     <property name="text">
+      <string>On save data compression image(s) as NRRD</string>
+     </property>
+    </widget>
+   </item>
   </layout>
  </widget>
  <layoutdefault spacing="6" margin="11"/>

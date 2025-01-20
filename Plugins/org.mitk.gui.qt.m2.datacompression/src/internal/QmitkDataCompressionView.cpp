@@ -113,44 +113,91 @@ void QmitkDataCompressionView::CreateQtPartControl(QWidget *parent)
   connect(m_Controls.btnRunPCA, SIGNAL(clicked()), this, SLOT(OnStartPCA()));
   connect(m_Controls.btnRunKMeans, SIGNAL(clicked()), this, SLOT(OnStartKMeans()));
   connect(m_Controls.btnRunTSNE, SIGNAL(clicked()), this, SLOT(OnStartTSNE()));
- 
+  connect(m_Controls.btnSaveDataCompressionResults, SIGNAL(clicked()), this, SLOT(OnSaveDataCompressionResults()));
 }
+
+void QmitkDataCompressionView::OnSaveDataCompressionResults()
+{
+  
+  auto selectedNodes = m_Controls.imageSelection->GetSelectedNodesStdVector();
+  for (auto node : selectedNodes)
+  {
+    std::string inputLocation;
+    node->GetStringProperty("MITK.IO.reader.inputlocation", inputLocation);
+    
+    
+    if (auto child = this->GetDataStorage()->GetNamedDerivedNode("PCA", node)){
+      auto pcaImage = dynamic_cast<mitk::Image *>(child->GetData());
+      mitk::IOUtil::Save(pcaImage, 
+      itksys::SystemTools::GetFilenamePath(inputLocation) + "/" +
+      itksys::SystemTools::GetFilenameWithoutLastExtension(inputLocation) + ".PCA.nrrd");
+    }
+
+        
+    if (auto child = this->GetDataStorage()->GetNamedDerivedNode("tSNE", node)){
+      auto pcaImage = dynamic_cast<mitk::Image *>(child->GetData());
+      mitk::IOUtil::Save(pcaImage, 
+      itksys::SystemTools::GetFilenamePath(inputLocation) + "/" +
+      itksys::SystemTools::GetFilenameWithoutLastExtension(inputLocation) + ".tSNE.nrrd");
+    }
+   
+    auto predicate = mitk::NodePredicateFunction::New([] (const mitk::DataNode *node) -> bool
+    {
+      return node->GetName().find("KMeans_") != std::string::npos;
+    });
+
+    auto derivations = this->GetDataStorage()->GetDerivations(node, predicate, true);
+    for(auto child : *derivations){
+      auto pcaImage = dynamic_cast<mitk::Image *>(child->GetData());
+      mitk::IOUtil::Save(pcaImage, 
+      itksys::SystemTools::GetFilenamePath(inputLocation) + "/" +
+      itksys::SystemTools::GetFilenameWithoutLastExtension(inputLocation) + "." + child->GetName() +".nrrd");
+    }
+  }
+  }
+
 
 void QmitkDataCompressionView::SetFocus() {}
 
-  
-
-
-
 void QmitkDataCompressionView::OnStartKMeans()
 {
-  for (auto imageNode : m_Controls.imageSelection->GetSelectedNodesStdVector())
+  m2::KMeansImageFilter::Pointer filter = m2::KMeansImageFilter::New();
+  filter->SetNumberOfClusters(m_Controls.kmeans_clusters->value());
+
+  std::string vectorNodeNames = "";
+  auto vectorNodes = m_Controls.peakListSelection->GetSelectedNodesStdVector();
+  // for each selected peak list different clusters are cerated
+  for (auto vectorNode : vectorNodes)
   {
-    for (auto vectorNode : m_Controls.peakListSelection->GetSelectedNodesStdVector())
+    auto vector = dynamic_cast<m2::IntervalVector *>(vectorNode->GetData());
+    filter->SetIntervals(vector->GetIntervals());
+      
+    // all pixels of all images are used to create the clusters
+    unsigned int imageId = 0;
+    for (auto imageNode : m_Controls.imageSelection->GetSelectedNodesStdVector())
     {
       auto image = dynamic_cast<m2::ImzMLSpectrumImage *>(imageNode->GetData());
-      if (!image->GetImageAccessInitialized())
-        return;
-
-      auto vector = dynamic_cast<m2::IntervalVector *>(vectorNode->GetData());
-      if (!vector)
-        return;
-        
-      m2::KMeansImageFilter::Pointer filter = m2::KMeansImageFilter::New();
-      filter->SetInput(image);
-      filter->SetIntervals(vector->GetIntervals());
-      filter->SetNumberOfClusters(m_Controls.kmeans_clusters->value());
-      filter->GenerateData();
-
-      mitk::DataNode::Pointer node2 = mitk::DataNode::New();
-      node2->SetData(filter->GetOutput(0));
-      node2->SetName("ClusteredImage");
-      this->GetDataStorage()->Add(node2);
-
+      filter->SetInput(image, imageId++);
     }
+    vectorNodeNames += vectorNode->GetName() + "_";
   }
-}
+  vectorNodeNames.pop_back();
 
+  filter->GenerateData();
+
+  auto selectedNodes = m_Controls.imageSelection->GetSelectedNodesStdVector();
+  int i = 0;
+  for(auto s : selectedNodes)
+  {  
+    auto outputNode = mitk::DataNode::New();
+    mitk::Image::Pointer data = filter->GetOutput(0);
+    outputNode->SetData(filter->GetOutput(i++));
+    outputNode->SetName("KMeans_" + std::to_string(m_Controls.kmeans_clusters->value()) + "_" + vectorNodeNames);
+    this->GetDataStorage()->Add(outputNode, const_cast<mitk::DataNode *>(s.GetPointer()));  
+  }
+
+
+}
 
 void QmitkDataCompressionView::OnStartPCA()
 {
@@ -198,11 +245,16 @@ void QmitkDataCompressionView::OnStartPCA()
       filter->Update();
       progressBar->Progress();
 
-      auto outputNode = mitk::DataNode::New();
-      mitk::Image::Pointer data = filter->GetOutput(0);
-      outputNode->SetData(data);
-      outputNode->SetName("PCA");
-      this->GetDataStorage()->Add(outputNode, const_cast<mitk::DataNode *>(imageNode.GetPointer()));
+      auto child = this->GetDataStorage()->GetNamedDerivedNode("PCA", imageNode);
+      if (!child){     
+        auto outputNode = mitk::DataNode::New();
+        mitk::Image::Pointer data = filter->GetOutput(0);
+        outputNode->SetData(data);
+        outputNode->SetName("PCA");
+        this->GetDataStorage()->Add(outputNode, const_cast<mitk::DataNode *>(imageNode.GetPointer()));
+      }else{
+        child->SetData(filter->GetOutput(0));
+      }
     }
   }
 
@@ -222,11 +274,11 @@ void QmitkDataCompressionView::OnStartTSNE()
     if (auto image = dynamic_cast<m2::SpectrumImage *>(node->GetData()))
     {
       
-      auto child = this->GetDataStorage()->GetNamedDerivedNode("PCA", node);
-      if (!child)
+      auto pcaChild = this->GetDataStorage()->GetNamedDerivedNode("PCA", node);
+      if (!pcaChild)
         return;
 
-      auto pcaImage = dynamic_cast<mitk::Image *>(child->GetData());
+      auto pcaImage = dynamic_cast<mitk::Image *>(pcaChild->GetData());
       const auto pcaComponents = pcaImage->GetPixelType().GetNumberOfComponents();
 
       auto filter = m2::TSNEImageFilter::New();
@@ -235,17 +287,19 @@ void QmitkDataCompressionView::OnStartTSNE()
       filter->SetTheta(m_Controls.tsne_theta->value());
 
       using MaskImageType = itk::Image<mitk::LabelSetImage::PixelType, 3>;
-      MaskImageType::Pointer maskImageItk;
-      mitk::Image::Pointer maskImage;
-      mitk::CastToItkImage(image->GetMaskImage(), maskImageItk);
-      auto caster = itk::ShrinkImageFilter<MaskImageType, MaskImageType>::New();
-      caster->SetInput(maskImageItk);
-      caster->SetShrinkFactor(0, m_Controls.tsne_shrink->value());
-      caster->SetShrinkFactor(1, m_Controls.tsne_shrink->value());
-      caster->SetShrinkFactor(2, 1);
-      caster->Update();
-
-      mitk::CastToMitkImage(caster->GetOutput(), maskImage);
+      auto maskImage =image->GetMaskImage();
+      
+      if(m_Controls.tsne_shrink->value() > 1){
+        MaskImageType::Pointer maskImageItk;
+        mitk::CastToItkImage(maskImage, maskImageItk);
+        auto caster = itk::ShrinkImageFilter<MaskImageType, MaskImageType>::New();
+        caster->SetInput(maskImageItk);
+        caster->SetShrinkFactor(0, m_Controls.tsne_shrink->value());
+        caster->SetShrinkFactor(1, m_Controls.tsne_shrink->value());
+        caster->SetShrinkFactor(2, 1);
+        caster->Update();
+        mitk::CastToMitkImage(caster->GetOutput(), maskImage);
+      }
 
       filter->SetMaskImage(maskImage);
       // const auto &peakList = image->GetPeaks();
@@ -267,28 +321,40 @@ void QmitkDataCompressionView::OnStartTSNE()
             *(outCData + k) = *(inputData + (k * pcaComponents) + index);
         }
 
-        DisplayImageType::Pointer cImage;
-        mitk::CastToItkImage(I, cImage);
-
-        auto caster = itk::ShrinkImageFilter<DisplayImageType, DisplayImageType>::New();
-        caster->SetInput(cImage);
-        caster->SetShrinkFactor(0, m_Controls.tsne_shrink->value());
-        caster->SetShrinkFactor(1, m_Controls.tsne_shrink->value());
-        caster->SetShrinkFactor(2, 1);
-        caster->Update();
-
-        // Buffer the image
-        mitk::CastToMitkImage(caster->GetOutput(), I);
+        if(m_Controls.tsne_shrink->value() > 1){
+          DisplayImageType::Pointer cImage;
+          mitk::CastToItkImage(I, cImage);
+          auto caster = itk::ShrinkImageFilter<DisplayImageType, DisplayImageType>::New();
+          caster->SetInput(cImage);
+          caster->SetShrinkFactor(0, m_Controls.tsne_shrink->value());
+          caster->SetShrinkFactor(1, m_Controls.tsne_shrink->value());
+          caster->SetShrinkFactor(2, 1);
+          caster->Update();
+          mitk::CastToMitkImage(caster->GetOutput(), I);
+        }
+        
         filter->SetInput(index, I);
         ++index;
       }
       filter->Update();
 
-      auto outputNode = mitk::DataNode::New();
+
+      
       auto data = m2::MultiSliceFilter::ConvertMitkVectorImageToRGB(ResampleVectorImage(filter->GetOutput(), image));
-      outputNode->SetData(data);
-      outputNode->SetName("tSNE");
-      this->GetDataStorage()->Add(outputNode, const_cast<mitk::DataNode *>(node.GetPointer()));
+      auto child = this->GetDataStorage()->GetNamedDerivedNode("tSNE", node);
+      if (!child){     
+        auto outputNode = mitk::DataNode::New();
+        outputNode->SetData(data);
+        outputNode->SetName("tSNE");
+        this->GetDataStorage()->Add(outputNode, const_cast<mitk::DataNode *>(node.GetPointer()));
+      }else{
+        child->SetData(data);
+      }
+
+      // auto outputNode = mitk::DataNode::New();
+      // outputNode->SetData(data);
+      // outputNode->SetName("tSNE");
+      // this->GetDataStorage()->Add(outputNode, const_cast<mitk::DataNode *>(node.GetPointer()));
 
     }
   }
@@ -319,7 +385,7 @@ mitk::Image::Pointer QmitkDataCompressionView::ResampleVectorImage(mitk::Image::
   auto inAdaptor = VectorImageAdaptorType::New();
   auto outAdaptor = VectorImageAdaptorType::New();
   using LinearInterpolatorType = itk::LinearInterpolateImageFunction<VectorImageAdaptorType>;
-  using TransformType = itk::IdentityTransform<m2::DisplayImagePixelType, 3>;
+  using TransformType = itk::IdentityTransform<double, 3>;
 
   for (unsigned int i = 0; i < components; ++i)
   {

@@ -52,6 +52,11 @@ void m2::TSNEImageFilter::SetNumberOfOutputDimensions(unsigned int v)
   this->m_NumberOfOutputDimensions = v;
 }
 
+void m2::TSNEImageFilter::SetProgressFunc(std::function<void()> f)
+{
+  this->m_ProgressFunc = f;
+}
+
 void m2::TSNEImageFilter::GenerateData()
 {
   MITK_INFO << "-----------------------";
@@ -64,8 +69,6 @@ void m2::TSNEImageFilter::GenerateData()
   m_NumberOfOutputDimensions = 3;
   m_NumberOfInputDimensions = data.size();
 
-  if (m_NumberOfInputDimensions <= m_NumberOfOutputDimensions)
-    mitkThrow() << "WHAT";
   MITK_INFO << "Input features " << m_NumberOfInputDimensions << " ~ Numbers of indexed input images";
   MITK_INFO << "Output features " << m_NumberOfOutputDimensions;
 
