@@ -34,6 +34,7 @@ See LICENSE.txt or https://www.github.com/jtfcordes/m2aia for details.
 #include <qfuturewatcher.h>
 #include <qlistwidget.h>
 #include <qprocess.h>
+#include <ui_ParameterFileEditorDialog.h>
 
 /**
   \brief m2Reconstruction3D
@@ -51,6 +52,8 @@ class m2Reconstruction3D : public QmitkAbstractView
 
 public:
   static const std::string VIEW_ID;
+  QFutureWatcher<void> m_ExportProcessFutureWatcher;
+  QFutureWatcher<void> m_ReconstructionFutureWatcher;
 
 protected:
   virtual void CreateQtPartControl(QWidget *parent) override;
@@ -60,6 +63,7 @@ protected:
   struct DataTuple
   {
     mitk::Image::Pointer image, mask;
+    mitk::DataNode::Pointer node;
     mitk::PointSet::Pointer points;
   };
 
@@ -79,9 +83,14 @@ protected:
 
   std::map<unsigned int, DataTuple> m_referenceMap;
 
+  Ui::elxParameterFileEditor m_ParameterFileEditorControls;
+  QDialog *m_ParameterFileEditor;
+  std::vector<std::string> m_ParameterFiles;
+
 public slots:
   void OnUpdateList();
   void OnStartStacking();
+  void OnStartExport();
 };
 
 #endif // m2Reconstruction3D_h
