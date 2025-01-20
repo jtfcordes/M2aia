@@ -174,7 +174,7 @@ namespace m2
                                                                 {"Float", 0},
                                                                 {"Double", 1}};
 
-  using DisplayImagePixelType = double;
+  using DisplayImagePixelType = float;
   using NormImagePixelType = double;
   using IndexType = unsigned int;
   using WorldCoordinateType = float;
