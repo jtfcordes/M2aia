@@ -295,7 +295,7 @@ void m2PeakPickingView::OnStartExportImages() {
       // mitk::PixelType newPixelType = mitk::MakePixelType<typename itk::VectorImage<m2::DisplayImagePixelType, 3>>(centroids->GetIntervals().size());
       // auto clone = ionImage->GetGeometry()->Clone();
       // stack->Initialize(newPixelType, *clone);
-      using PixelType = m2::DisplayImagePixelType;
+      using PixelType = float;
       auto vectorImage = itk::VectorImage<PixelType, 3>::New();
       vectorImage->SetVectorLength(centroids->GetIntervals().size());
       
@@ -336,9 +336,11 @@ void m2PeakPickingView::OnStartExportImages() {
       stack->SetOrigin(ionImage->GetGeometry()->GetOrigin());
       stack->GetGeometry()->SetIndexToWorldTransform(ionImage->GetGeometry()->GetIndexToWorldTransform());
 
+      std::string centroidValues;
       
       for(const m2::Interval & i: centroids->GetIntervals()){
 
+        centroidValues = centroidValues + std::to_string(i.x.mean()) + ",";
         emit m2::UIUtils::Instance()->RequestTolerance(i.x.mean(), tol);
         image->GetImage(i.x.mean(), tol, image->GetMaskImage(), image);
         
@@ -349,28 +351,26 @@ void m2PeakPickingView::OnStartExportImages() {
 
         mitk::ImagePixelReadAccessor<m2::DisplayImagePixelType,3> imageAcc(ionImage);
         imageAcc.GetData();
-        mitk::ImagePixelReadAccessor<m2::DisplayImagePixelType,3> stackAcc(stack);
+        mitk::ImagePixelReadAccessor<PixelType,3> stackAcc(stack);
         for(unsigned int x = 0; x < ionImage->GetDimensions()[0]; ++x)
           for(unsigned int y = 0; y < ionImage->GetDimensions()[1]; ++y)
             for(unsigned int z = 0; z < ionImage->GetDimensions()[2]; ++z){
                 auto v = stackAcc.GetConsecutivePixelsAsVector({x,y,z}, centroids->GetIntervals().size());
                 v[component] = imageAcc.GetPixelByIndex({x,y,z});
-                
-
             }
-        
-        
-        ++component;
-
-        
+        ++component;        
       }
+
+      if (!centroidValues.empty())
+        centroidValues.pop_back(); // Remove the trailing comma
+
+      stack->SetProperty("m2aia.centroid.mz.values", mitk::StringProperty::New(centroidValues));
 
       auto node = mitk::DataNode::New();
       node->SetData(stack);
       node->SetName(imageNode->GetName() + ".stack");
       node->SetVisibility(false);
       GetDataStorage()->Add(node);
-      // mitk::IOUtil::Save(stack, file.toStdString());
     }
   }
 

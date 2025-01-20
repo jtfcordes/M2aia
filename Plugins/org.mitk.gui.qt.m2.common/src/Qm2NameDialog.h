@@ -16,21 +16,21 @@ See LICENSE.txt or https://www.github.com/jtfcordes/m2aia for details.
 
 #pragma once
 #include <org_mitk_gui_qt_m2_common_Export.h>
-#include "ui_m2NameDialogControls.h"
+#include "ui_Qm2NameDialogControls.h"
 #include <QDialog>
 
-class MITK_M2_CORE_HELPER_EXPORT m2NameDialog : public QDialog
+class MITK_M2_CORE_HELPER_EXPORT Qm2NameDialog : public QDialog
 {
   Q_OBJECT
 
 public:
-  explicit m2NameDialog(QWidget *parent = nullptr) : QDialog(parent)
+  explicit Qm2NameDialog(QWidget *parent = nullptr) : QDialog(parent)
   {
     m_Controls.setupUi(this);
     this->setSizeGripEnabled(true);
   }
 
-  virtual  ~m2NameDialog(){}
+  virtual  ~Qm2NameDialog(){}
 
   int exec() override
   {
