@@ -252,6 +252,37 @@ void m2Spectrum::OnDataModified(const itk::Object *caller, const itk::EventObjec
   }
 }
 
+// void m2Spectrum::OnDataModified(const itk::Object *caller, const itk::EventObject &)
+// {
+//   if (auto node = dynamic_cast<const mitk::DataNode *>(caller))
+//   {
+//     bool isM2Modified = false;
+//     if(node->GetBoolProperty("m2aia.modified", isM2Modified)){
+//       if(isM2Modified){
+//         MITK_INFO << "m2aia.modified";
+//         m_DataProvider[node]->Update();
+//         UpdateAllSeries();
+//         UpdateGlobalMinMaxValues();
+//         UpdateCurrentMinMaxY();
+//         DrawSelectedArea();
+//         AutoZoomUseLocalExtremaY();
+//         const_cast<mitk::DataNode *>(node)->SetBoolProperty("m2aia.modified", false);
+//       }
+//     }
+//     // if (dynamic_cast<m2::IntervalVector *>(node->GetData()))
+//     // {
+//     //   auto provider = m_DataProvider[node];
+//     //   provider->Update();
+//     //   MITK_INFO << "OnDataModified";
+//     //   provider->UpdateBoundaries(m_LocalMinimumX, m_LocalMaximumX);
+//     //   UpdateCurrentMinMaxY();
+//     //   UpdateGlobalMinMaxValues();
+//     //   DrawSelectedArea();
+//     //   AutoZoomUseLocalExtremaY();
+//     // }
+//   }
+// }
+
 void m2Spectrum::OnPropertyListChanged(const itk::Object *caller, const itk::EventObject &)
 {
   if (auto node = dynamic_cast<const mitk::DataNode *>(caller))

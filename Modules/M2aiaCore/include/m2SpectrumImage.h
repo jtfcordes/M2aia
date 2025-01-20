@@ -250,7 +250,7 @@ namespace m2
     SmoothingType m_SmoothingStrategy = m2::SmoothingType::None;
     IntensityTransformationType m_IntensityTransformationStrategy = m2::IntensityTransformationType::None;
 
-    NormalizationStrategyType m_NormalizationStrategy = NormalizationStrategyType::TIC;
+    NormalizationStrategyType m_NormalizationStrategy = NormalizationStrategyType::None;
     RangePoolingStrategyType m_RangePoolingStrategy = RangePoolingStrategyType::Sum;
 
     ImageNormalizationStrategyType m_ImageNormalizationStrategy = ImageNormalizationStrategyType::None;

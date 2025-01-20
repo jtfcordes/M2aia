@@ -42,7 +42,7 @@ namespace m2
      * This method is used if x1 and x2 of the chart view changes.
     */
     void UpdateBoundaries(double x1 = -1, double x2 = -1);
-
+    
     /**
      *  @brief Degenerate rawdata for LoD data.
     */

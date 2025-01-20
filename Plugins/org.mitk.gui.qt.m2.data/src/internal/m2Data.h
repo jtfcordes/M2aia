@@ -24,8 +24,8 @@ See LICENSE.txt or https://www.github.com/jtfcordes/m2aia for details.
 
 #include <m2UIUtils.h>
 
-#include <QThreadPool>
-
+// #include <QThreadPool>
+#include <QtConcurrent>
 /**
   \brief DataView
 
@@ -120,6 +120,7 @@ signals:
 protected:
   void CreateQtPartControl(QWidget *parent) override;
   void NodeAdded(const mitk::DataNode *node) override;
+  QFuture<void> m_ResetPreventDataStorageOverload;
   void NodeRemoved(const mitk::DataNode *node) override;
   void SetFocus() override {}
 
@@ -149,6 +150,7 @@ protected:
 
   QThreadPool m_pool;
   m2::SpectrumType m_CurrentOverviewSpectrumType = m2::SpectrumType::Maximum;
+
 
   // m2::IonImageReference::Pointer m_IonImageReference;
   /*!

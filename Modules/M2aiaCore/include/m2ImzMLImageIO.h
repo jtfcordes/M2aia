@@ -34,52 +34,6 @@ namespace m2
    * Writes/Reads ImzML images
    * @ingroup Process
    */
-  // The export macro should be removed. Currently, the unit
-  // tests directly instantiate this class.
-
-
-  // Function to calculate the difference between consecutive m/z values
-  template< class MzType >
-  std::vector<double> calculateMzDifferences(const std::vector<MzType>& mz) {
-      std::vector<double> differences;
-      for (size_t i = 1; i < mz.size(); ++i) {
-          differences.push_back(mz[i] - mz[i - 1]);
-      }
-      return differences;
-  }
-
-  // Function to check if a spectrum is centroided or profile
-  template< class MzType, class IntensityType >
-  std::string identifySpectrumType(const std::vector<MzType>& mz, const std::vector<IntensityType>& intensities) {
-      if (mz.size() != intensities.size() || mz.empty()) {
-          return "Invalid data";
-      }
-
-      std::vector<double> mzDifferences = calculateMzDifferences(mz);
-
-      // Analyze m/z differences: centroided data often has larger gaps
-      double averageMzDiff = 0.0;
-      for (double diff : mzDifferences) {
-          averageMzDiff += diff;
-      }
-      averageMzDiff /= mzDifferences.size();
-
-      // Analyze intensity data: profile data has smooth changes, centroided has spikes
-      size_t spikeCount = 0;
-      for (size_t i = 1; i < intensities.size() - 1; ++i) {
-          if (intensities[i] > intensities[i - 1] && intensities[i] > intensities[i + 1]) {
-              spikeCount++;
-          }
-      }
-
-      // Heuristic thresholds for determination
-      if (averageMzDiff > 0.1 && spikeCount < intensities.size() / 5) {
-          return "centroid spectrum";
-      } else {
-          return "profile spectrum";
-      }
-  }
-
 
   using namespace std::string_literals;
   class M2AIACORE_EXPORT ImzMLImageIO : public mitk::AbstractFileIO
@@ -129,6 +83,7 @@ namespace m2
     std::string GetImzMLOutputPath() const;
     void WriteContinuousProfile(m2::ImzMLSpectrumImage::SpectrumVectorType & spectra) const;
     void WriteContinuousCentroid(m2::ImzMLSpectrumImage::SpectrumVectorType & spectra) const;
+    void WriteContinuousCentroid3DStack(const m2::SpectrumImageStack *) const;
     void WriteProcessedProfile(m2::ImzMLSpectrumImage::SpectrumVectorType & spectra) const;
     void WriteProcessedCentroid(m2::ImzMLSpectrumImage::SpectrumVectorType & spectra) const;
 

@@ -249,13 +249,13 @@ void m2::ImzMLParser::ReadImageMetaData(m2::ImzMLSpectrumImage::Pointer data)
     }; 
 
 
-        // https://github.com/m2aia/imzML/blob/master/imagingMS.obo#L113
+        
     accession_map["MS:1000127"] = [&](auto line) { // "continuous"
       ContextValueToStringProperty(line);
     data->SetPropertyValue<std::string>("m2aia.imzml.spectrum_type", name);
     }; 
 
-    // https://github.com/m2aia/imzML/blob/master/imagingMS.obo#L119
+    
     accession_map["MS:1000128"] = [&](auto line) { // "processed"
       ContextValueToStringProperty(line); 
     data->SetPropertyValue<std::string>("m2aia.imzml.spectrum_type", name);

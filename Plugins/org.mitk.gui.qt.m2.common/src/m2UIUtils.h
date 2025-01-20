@@ -43,7 +43,7 @@ namespace m2
 
   public:
     using NodesVectorType = itk::VectorContainer<unsigned, mitk::DataNode::Pointer>;
-    static NodesVectorType::Pointer AllNodes(const mitk::DataStorage*  dataStoarage);
+    static NodesVectorType::Pointer AllNodes(const mitk::DataStorage*  dataStorage);
 
   signals:
     void SpectrumImageNodeAdded(const mitk::DataNode *);

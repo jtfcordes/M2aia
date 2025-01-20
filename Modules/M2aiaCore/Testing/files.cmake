@@ -4,4 +4,5 @@ set(MODULE_TESTS
   m2CoreMappingsTest.cpp
   m2ElxUtilTest.cpp
   m2SignalGroupBinningTest.cpp
+  m2BaselineTest.cpp
 )

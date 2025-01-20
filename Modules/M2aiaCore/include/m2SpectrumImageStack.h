@@ -57,7 +57,6 @@ namespace m2
 
     unsigned int m_StackSize;
     double m_SpacingZ;
-    bool m_UseSliceWiseMaximumNormalization = true;
 
   public:
     // 
@@ -71,9 +70,6 @@ namespace m2
     void InitializeProcessor() override;
     void InitializeImageAccess() override;
     void InitializeNormalizationImage(m2::NormalizationStrategyType /*type*/) override{}
-
-    bool GetUseSliceWiseMaximumNormalization(){return m_UseSliceWiseMaximumNormalization;}
-    void SetUseSliceWiseMaximumNormalization(bool v){m_UseSliceWiseMaximumNormalization = v;}
 
     virtual void GetImage(double mz, double tol, const mitk::Image *mask, mitk::Image *img) const override;
     virtual void GetSpectrumFloat(unsigned int, std::vector<float> &, std::vector<float> &) const override{}

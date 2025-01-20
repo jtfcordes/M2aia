@@ -113,8 +113,8 @@ namespace m2
         while (xIt != xEnd && *xIt < (currentBin + 1) * binSize)
         {
           // p.index(currentIndex);
-          p.x(*xIt);
-          p.y(*yIt);
+          p.x.add(*xIt);
+          p.y.add(*yIt);
           ++xIt;
           ++yIt;
           ++currentIndex;
@@ -225,8 +225,8 @@ namespace m2
           auto yIt = begin(ys) + left;
           auto xIt = begin(xs) + left;
           for(; xIt != begin(xs) + gapIdx; ++xIt, ++yIt){
-            i.x(*xIt);
-            i.y(*yIt);
+            i.x.add(*xIt);
+            i.y.add(*yIt);
           }
 
           
@@ -248,8 +248,8 @@ namespace m2
           auto yIt = begin(ys) + gapIdx;
           auto xIt = begin(xs) + gapIdx;
           for(; xIt != begin(xs) + right; ++xIt, ++yIt){
-            i.x(*xIt);
-            i.y(*yIt);
+            i.x.add(*xIt);
+            i.y.add(*yIt);
           }
 
           // fill(begin(bin_assignments) + gapIdx, begin(bin_assignments) + right, current_id);

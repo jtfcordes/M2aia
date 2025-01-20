@@ -24,6 +24,7 @@ namespace m2
 
   struct Accumulator
   {
+
     double mean() const { return m_sum / double(m_count); }
     double sum() const { return m_sum; }
     double min() const { return m_min; }
@@ -32,16 +33,25 @@ namespace m2
 
     double m_sum = 0;
     double m_min = std::numeric_limits<double>::max();
-    double m_max = std::numeric_limits<double>::min();
+    double m_max = 0;
     unsigned int m_count = 0;
 
-    void operator()(double v)
+    void add(double v)
     {
       m_sum += v;
       m_min = std::min(m_min, v);
       m_max = std::max(m_max, v);
       ++m_count;
     }
+
+    // Accumulator &operator+=(const double &s)
+    // {
+    //   m_sum += rhs.m_sum;
+    //   m_count += rhs.m_count;
+    //   m_min = std::min(m_min, rhs.m_min);
+    //   m_max = std::max(m_max, rhs.m_max);
+    //   return *this;
+    // }
 
     Accumulator &operator+=(const Accumulator &rhs)
     {
@@ -52,15 +62,15 @@ namespace m2
       return *this;
     }
 
-    Accumulator operator+(const Accumulator &rhs)
-    {
-      Accumulator res;
-      res.m_sum = rhs.m_sum + m_sum;
-      res.m_count = rhs.m_sum + m_count;
-      res.m_min = std::min(m_min, rhs.m_min);
-      res.m_max = std::max(m_max, rhs.m_max);
-      return res;
-    }
+    // Accumulator operator+(const Accumulator &rhs)
+    // {
+    //   Accumulator res;
+    //   res.m_sum +=  m_sum;
+    //   res.m_count = rhs.m_count + m_count;
+    //   res.m_min = std::min(m_min, rhs.m_min);
+    //   res.m_max = std::max(m_max, rhs.m_max);
+    //   return res;
+    // }
   };
 
   struct Interval
@@ -81,19 +91,25 @@ namespace m2
     Interval(double x, double y, unsigned int source = 0) : Interval(source)
     {
       // this->index(index);
-      this->x(x);
-      this->y(y);
+      this->x.add(x);
+      this->y.add(y);
     }
 
     Interval &operator+=(const Interval &rhs)
     {
       x += rhs.x;
       y += rhs.y;
-      // index += rhs.index;
       return *this;
     }
     friend bool operator<(const Interval &lhs, const Interval &rhs) { return lhs.x.mean() < rhs.x.mean(); }
     // friend bool operator==(const Interval &lhs, const Interval &rhs) { return lhs.x.mean() == rhs.x.mean(); }
+
+    std::string ToString() const
+    {
+      std::stringstream ss;
+      ss << "m/z " << x.mean() << " +/- " << y.mean() << " Da";
+      return ss.str();
+    }
   };
   
   

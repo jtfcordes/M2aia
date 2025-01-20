@@ -26,12 +26,23 @@ See LICENSE.txt for details.
 #include <mitkImageAccessByItk.h>
 #include <mitkImageReadAccessor.h>
 #include <mitkImageWriteAccessor.h>
+#include <mitkLabel.h>
 #include <mitkProgressBar.h>
 #include <signal/m2PeakDetection.h>
 
 #include <mitkCoreServices.h>
 #include <mitkIPreferencesService.h>
 #include <mitkIPreferences.h>
+#include <m2Process.hpp>
+
+
+#include "itkImage.h"
+#include "itkVectorImage.h"
+#include "itkDisplacementFieldTransform.h"
+#include "itkImageFileReader.h"
+#include "itkImageFileWriter.h"
+#include "itkResampleImageFilter.h"
+#include "itkLinearInterpolateImageFunction.h"
 
 namespace m2
 {
@@ -79,10 +90,10 @@ namespace m2
 
     auto &transformer = m_SliceTransformers.front();
     auto image = transformer->GetMovingImage();
+
     if (!transformer->GetTransformation().empty())
-    {
       image = transformer->WarpImage(image);
-    }
+
     std::copy(image->GetDimensions(), image->GetDimensions() + 3, dims);
     spacing = image->GetGeometry()->GetSpacing();
 
@@ -92,22 +103,35 @@ namespace m2
     spacing[2] = m_SpacingZ;
     this->GetGeometry()->SetSpacing(spacing);
 
-    unsigned int sliceId = 0;
+    auto imageSibling = this->Clone();
+    mitk::ImageWriteAccessor imageAccess(imageSibling);
+    auto imageData = static_cast<m2::DisplayImagePixelType *>(imageAccess.GetData());
+    std::fill(imageData, imageData + imageSibling->GetDimension(0) * imageSibling->GetDimension(1) * imageSibling->GetDimension(2), 0);
+
+    auto labelImage = mitk::LabelSetImage::New();
+    labelImage->Initialize(this);
+    this->SetMaskImage(labelImage);
 
     // fill with data
+    unsigned int sliceId = 0;
     for (auto &transformer : m_SliceTransformers)
     {      
-      if (auto movingImage = transformer->GetMovingImage())
+      if (auto movingImage = dynamic_cast<m2::SpectrumImage*>(transformer->GetMovingImage().GetPointer()))
       {
         // create temp image and copy requested image range to the stack
         if (!transformer->GetTransformation().empty())
         {
-          movingImage = transformer->WarpImage(movingImage);
-          CopyWarpedImageToStackImage(movingImage, this, sliceId);
+          auto warpedImage = transformer->WarpImage(movingImage);
+          CopyWarpedImageToStackImage(warpedImage, this, sliceId);
+
+          // selecting "short" as pixel type for nearest neighbor interpolation
+          auto warpedMask = transformer->WarpImage(movingImage->GetMaskImage(), "short"); 
+          CopyWarpedImageToStackImage(warpedMask, GetMaskImage(), sliceId);
         }
         else
         {
           CopyWarpedImageToStackImage(movingImage, this, sliceId);
+          CopyWarpedImageToStackImage(movingImage->GetMaskImage(), GetMaskImage(), sliceId);
         }
       }
       ++sliceId;
@@ -235,58 +259,100 @@ namespace m2
     if (i >= stack->GetDimensions()[2])
       mitkThrow() << "Stack index is invalid! Z dim is " << stack->GetDimensions()[2];
 
-    mitk::ImageWriteAccessor stackAccess(stack);
-    auto stackData = static_cast<m2::DisplayImagePixelType *>(stackAccess.GetData());
+    AccessTwoImagesFixedDimensionByItk( warped, stack, ([&](auto warpedItk, auto stackItk) {
+      auto warpedItkData = warpedItk->GetBufferPointer();
+      auto stackItkData = stackItk->GetBufferPointer();
+      std::copy(warpedItkData, warpedItkData + warpN, stackItkData + (i * stackN));
+    }), 3);
 
-    if(m_UseSliceWiseMaximumNormalization){
-      AccessByItk(warped,
-                (
-                  [&](auto itkImg)
-                  {
-                    auto warpedData = itkImg->GetBufferPointer();
-                    auto max = *(std::max_element(warpedData, warpedData + stackN));
-                    std::transform(warpedData, warpedData + stackN, stackData + (i * stackN), [max](auto v){return v/max;});
-                  }));
-    }else{
-
-
-    AccessByItk(warped,
-                (
-                  [&](auto itkImg)
-                  {
-                    auto warpedData = itkImg->GetBufferPointer();
-                    std::copy(warpedData, warpedData + stackN, stackData + (i * stackN));
-                  }));
-    }
   }
 
   void SpectrumImageStack::GetImage(double center, double tol, const mitk::Image * /*mask*/, mitk::Image *img) const
   {
-    mitk::ProgressBar::GetInstance()->AddStepsToDo(m_SliceTransformers.size());
-    int sliceId = 0;
-    for (auto &transformer : m_SliceTransformers)
-    {
-      mitk::ProgressBar::GetInstance()->Progress();
-      
-      
-      if (auto spectrumImage = dynamic_cast<m2::SpectrumImage *>(transformer->GetMovingImage().GetPointer()))
-      {
-        // create temp image and copy requested image range to the stack
-        auto imageTemp = mitk::Image::New();
-        imageTemp->Initialize(spectrumImage);
-        spectrumImage->GetImage(center, tol, spectrumImage->GetMaskImage(), imageTemp);
-        if (!transformer->GetTransformation().empty())
-        {
-          imageTemp = transformer->WarpImage(imageTemp);
-          CopyWarpedImageToStackImage(imageTemp, img, sliceId);
-        }
-        else
-        {
-          CopyWarpedImageToStackImage(imageTemp, img, sliceId);
-        }
-      }
-      ++sliceId;
+
+    if (!img){
+      img = const_cast<mitk::Image *>(static_cast<const mitk::Image *>(this));
     }
+
+    // if (!mask){
+    //   mask = const_cast<mitk::Image *>(static_cast<const mitk::Image *>(this->GetMaskImage()));
+    // }
+
+    // mitk::ProgressBar::GetInstance()->AddStepsToDo(m_SliceTransformers.size());
+    // std::vector<mitk::Image::Pointer> images;
+    // m2::Process::Map(m_SliceTransformers.size(), 2, [&](auto /*tId*/, auto a, auto b)
+    // {
+    // for (unsigned int i = a; i < b; ++i)
+    // unsigned int i = 0;
+    // for(auto transformer : m_SliceTransformers)
+
+      // mutex
+    std::mutex mutex;
+
+
+      m2::Process::Map(m_SliceTransformers.size(),8,[&](auto /*tId*/, auto a, auto b)
+        {
+          for (unsigned int i = a; i < b; ++i)
+          {
+            auto transformer = m_SliceTransformers[i];
+            if (auto spectrumImage = dynamic_cast<m2::SpectrumImage *>(transformer->GetMovingImage().GetPointer()))
+            {
+              // create temp image and copy requested image range to the stack
+              auto imageTemp = mitk::Image::New();
+              imageTemp->Initialize(spectrumImage);
+
+              spectrumImage->SetBaselineCorrectionStrategy(this->GetBaselineCorrectionStrategy());
+              spectrumImage->SetBaseLineCorrectionHalfWindowSize(this->GetBaseLineCorrectionHalfWindowSize());
+              spectrumImage->SetNormalizationStrategy(this->GetNormalizationStrategy());
+              spectrumImage->SetSmoothingStrategy(this->GetSmoothingStrategy());
+              spectrumImage->SetSmoothingHalfWindowSize(this->GetSmoothingHalfWindowSize());
+              spectrumImage->SetIntensityTransformationStrategy(this->GetIntensityTransformationStrategy());
+              spectrumImage->SetImageSmoothingStrategy(this->GetImageSmoothingStrategy());
+              spectrumImage->SetImageNormalizationStrategy(this->GetImageNormalizationStrategy());
+              spectrumImage->GetImage(center, tol, spectrumImage->GetMaskImage(), imageTemp);
+
+              if (!transformer->GetTransformation().empty())
+                imageTemp = transformer->WarpImage(imageTemp);
+              // images.push_back(imageTemp);
+              {
+                // lockguard
+                std::lock_guard<std::mutex> lock(mutex);
+                CopyWarpedImageToStackImage(imageTemp, img, i);
+              }
+            }
+          }
+        });
+    img->Modified();
+    // });
+    // unsigned int i = 0;
+    // for(auto imageTemp : images)
+
+    // MITK_INFO << "Done";
+    
+
+    // for (auto &transformer : m_SliceTransformers)
+    // {
+    //   mitk::ProgressBar::GetInstance()->Progress();
+      
+      
+    //   if (auto spectrumImage = dynamic_cast<m2::SpectrumImage *>(transformer->GetMovingImage().GetPointer()))
+    //   {
+    //     // create temp image and copy requested image range to the stack
+    //     auto imageTemp = mitk::Image::New();
+    //     imageTemp->Initialize(spectrumImage);
+    //     spectrumImage->GetImage(center, tol, spectrumImage->GetMaskImage(), imageTemp);
+    //     if (!transformer->GetTransformation().empty())
+    //     {
+    //       imageTemp = transformer->WarpImage(imageTemp);
+    //       CopyWarpedImageToStackImage(imageTemp, img, sliceId);
+    //     }
+    //     else
+    //     {
+    //       CopyWarpedImageToStackImage(imageTemp, img, sliceId);
+    //     }
+    //   }
+    //   ++sliceId;
+    // }
 
     // current->GetImage(mz, tol, current->GetMaskImage(), current);
 

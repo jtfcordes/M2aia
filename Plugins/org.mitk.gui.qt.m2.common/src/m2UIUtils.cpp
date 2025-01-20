@@ -21,7 +21,7 @@ See LICENSE.txt or https://www.github.com/jtfcordes/m2aia for details.
 #include <mitkNodePredicateAnd.h>
 #include <mitkNodePredicateDataType.h>
 
-m2::UIUtils::NodesVectorType::Pointer m2::UIUtils::AllNodes(const mitk::DataStorage * dataStoarage)
+m2::UIUtils::NodesVectorType::Pointer m2::UIUtils::AllNodes(const mitk::DataStorage * dataStorage)
 {
   auto nodesToProcess = itk::VectorContainer<unsigned int, mitk::DataNode::Pointer>::New();
   // is checked: all nodes that fit the predicate are processed
@@ -29,9 +29,9 @@ m2::UIUtils::NodesVectorType::Pointer m2::UIUtils::AllNodes(const mitk::DataStor
     mitk::NodePredicateAnd::New(mitk::TNodePredicateDataType<m2::SpectrumImage>::New(),
                                 mitk::NodePredicateNot::New(mitk::NodePredicateProperty::New("helper object")));
 
-  auto processableNodes = dataStoarage->GetSubset(predicate);
+  auto processableNodes = dataStorage->GetSubset(predicate);
 
-  // only visible nodes
+
   for (auto node : processableNodes->CastToSTLConstContainer())
   {
     bool visibility;

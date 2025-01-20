@@ -72,8 +72,9 @@ void m2::SeriesDataProvider::InitializeSeries()
   {
     m_Series = new QLineSeries();
     SetProfileSpectrumDefaultStyle(m_Series);
-    m_Series->setPointsVisible(false);
+    m_Series->setPointsVisible(false);    
   }
+
 }
 
 void m2::SeriesDataProvider::Update()
@@ -82,28 +83,35 @@ void m2::SeriesDataProvider::Update()
   {
     m_xs = m_IntervalVector->GetXMean();
     m_ys = m_IntervalVector->GetYMean(); // Critical?
-
-    // m_IntervalVector->
-
+    
+    // if (!m_DataLoD.empty() && !m_xs.empty() && 
+    //     0.000001 > std::abs(m_xs.front() - m_DataLoD.front().front().x()) &&
+    //     0.000001 > std::abs(m_xs.back() - m_DataLoD.front().back().x()))
+    // {
+    //   MITK_INFO << "Data already up to date";;
+    //   return;
+    // }
+  
     m_DataLoD.clear();
     if (m_Format == m2::SpectrumFormat::Centroid)
     {
       PointsVector target;
       using namespace std;
       transform(
-        begin(m_xs), end(m_xs), begin(m_ys), back_inserter(target), [](auto a, auto b) { return QPointF(a, b); });
+        begin(m_xs), end(m_xs), begin(m_ys), back_inserter(target), [&](auto a, auto b) {  
+        return QPointF(a, b); });
       m_DataLoD.push_back(target);
-      return;
+      
+    }else{
+      m_DataLoD.resize(m_Levels.size());
+      unsigned int dataLodVectorIndex = 0;
+      for (unsigned int level : m_Levels)
+      {
+        m_DataLoD[dataLodVectorIndex] = GenerateLoDData(m_xs, m_ys, level);
+        ++dataLodVectorIndex;
+      }
     }
 
-    m_DataLoD.resize(m_Levels.size());
-    unsigned int dataLodVectorIndex = 0;
-
-    for (unsigned int level : m_Levels)
-    {
-      m_DataLoD[dataLodVectorIndex] = GenerateLoDData(m_xs, m_ys, level);
-      ++dataLodVectorIndex;
-    }
   }else{
     mitkThrow() << "Interval Vector not set correctly";
   }

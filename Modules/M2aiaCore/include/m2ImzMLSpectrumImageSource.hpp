@@ -136,7 +136,9 @@ namespace m2
       [mean](auto s, auto val) { return s + std::pow(val - mean, 2); },
       [&maskIt](auto) { return *maskIt++ > 0; });
     auto stddev = std::sqrt(sum / N);
-    if(stddev<=0) MITK_ERROR << " stddev defect";
+    if(stddev<=0) {
+      MITK_ERROR << " stddev defect " << stddev << " " << sum << " " << N;
+    }
     return stddev;
   }
 
@@ -498,8 +500,7 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeNormal
 {
   // initialize the normalization iamge
   auto image = p->GetNormalizationImage(type);
-  // MITK_INFO << to_underlying(type);
-
+  MITK_INFO << "Initialize normalization image: " << m2::NormalizationStrategyTypeNames.at((unsigned int)(type));
   // create a write accessor
   using WriteAccessorType = mitk::ImagePixelWriteAccessor<NormImagePixelType, 3>;
   auto accNorm = std::make_shared<WriteAccessorType>(image);
@@ -1194,7 +1195,7 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
   // each thread pixelwise accumulate peaks
   std::vector<std::vector<m2::Interval>> peaksT(p->GetNumberOfThreads());
   for (auto &peaks : peaksT)
-    peaks.resize(mzs.size());
+    peaks.resize(mzs.size(), m2::Interval());
 
   // initialize normalization image accessor
   auto currentType = p->GetNormalizationStrategy();
@@ -1221,15 +1222,18 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
                        binaryDataToVector(f, iO, iL, ints.data());
 
                        auto nFac = accNorm.GetPixelByIndex(spectra[i].index);
+                       
                        std::transform(
-                         std::begin(ints), std::end(ints), std::begin(ints), [&nFac](auto &v) { return v / nFac; });
+                         std::begin(ints), std::end(ints), std::begin(ints), [&nFac](auto &v) { return v / (nFac+mitk::eps); });
 
+                      //  std::ofstream out("/tmp/test_"+std::to_string(t) + ".txt", std::ios::app | std::ios::out);
                        for (size_t i = 0; i < mzs.size(); ++i)
                        {
-                         //  peaksT[t][i].index(i);
-                         peaksT[t][i].x(mzs[i]);
-                         peaksT[t][i].y(ints[i]);
+                        //  out << std::to_string(ints[i]) << " ";
+                         peaksT[t][i].x.add(mzs[i]);
+                         peaksT[t][i].y.add(ints[i]);
                        }
+                      //  out << std::endl;
                      }
 
                      f.close();
@@ -1248,6 +1252,8 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
     for (size_t i = 0; i < peaks.size(); ++i)
     {
       finalPeaks[i] += peaks[i];
+      // MITK_INFO << peaks[i].y.max() << " " << peaks[i].y.sum() << " " << peaks[i].y.mean();
+      // MITK_INFO << finalPeaks[i].y.max() << " " << finalPeaks[i].y.sum() << " " << finalPeaks[i].y.mean();
     }
 
   for (const auto &peak : finalPeaks)
@@ -1256,6 +1262,19 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
     sum.push_back(peak.y.sum());
     mean.push_back(peak.y.mean());    
   }
+
+  // for(auto x : mean){
+  //   MITK_INFO << "mean " <<  x;
+  // }
+  
+  // for(auto x : skyline){
+  //   MITK_INFO << "skyline " <<  x;
+  // }
+
+  // for(auto x : sum){
+  //   MITK_INFO << "sum " <<  x;
+  // }
+  // exit(0);
 }
 
 template <class MassAxisType, class IntensityType>
@@ -1324,14 +1343,14 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
 
   // find overall min/max
   double binSize = 1;
-  double max = std::numeric_limits<double>::min();
-  double min = std::numeric_limits<double>::max();
+  double max = std::numeric_limits<float>::min();
+  double min = std::numeric_limits<float>::max();
 
   max = *std::max_element(std::begin(xMax), std::end(xMax));
   min = *std::min_element(std::begin(xMin), std::end(xMin));
   binSize = (max - min) / double(binsN);
 
-
+  
   m2::Process::Map(spectra.size(),
                    T,
                    [&](unsigned int t, unsigned int a, unsigned int b)
@@ -1353,16 +1372,21 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
                        ints.resize(intL);
                        binaryDataToVector(f, intO, intL, ints.data());
 
+                       assert(intL > 0);
+                       assert(mzL > 0);
+
                        // Normalization
                        if (p->GetNormalizationStrategy() != m2::NormalizationStrategyType::None)
                        {
-                         double nFac = accNorm.GetPixelByIndex(spectrum.index);
-                         std::transform(
-                           std::begin(ints), std::end(ints), std::begin(ints), [&nFac](auto &v) { return v / nFac; });
+                          double nFac = accNorm.GetPixelByIndex(spectrum.index);
+                          std::transform(
+                          std::begin(ints), std::end(ints), std::begin(ints), [&nFac](auto &v) { return v / nFac; });
                        }
 
                        for (unsigned int k = 0; k < mzs.size(); ++k)
                        {
+
+                     
                          // find index of the bin for the k'th m/z value of the pixel
                          auto j = (long)((mzs[k] - min) / binSize);
 
@@ -1376,6 +1400,7 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
                          yMaxT[t][j] = std::max(yMaxT[t][j], double(ints[k])); // intensitiy max
                          hT[t][j]++;                                           // hits
                        }
+                       
                      }
 
                      f.close();

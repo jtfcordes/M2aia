@@ -87,6 +87,64 @@
        </layout>
       </item>
       <item>
+       <layout class="QHBoxLayout" name="externalNormalizationLayout">
+        <item>
+         <widget class="QLabel" name="labelLoadExternalNormalization">
+          <property name="minimumSize">
+           <size>
+            <width>150</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>150</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Enter the &amp;lt;name&amp;gt; of the file to be loaded as external normalization. This file must be placed next to the input imzML file.&lt;br/&gt;&lt;br/&gt;The entered text &amp;lt;name&amp;gt; is interpreted as a regular expression and. The search path &amp;lt;path&amp;gt; is the directory of the corresponding imzML file with name &amp;lt;imzML&amp;gt;.&lt;br/&gt;&lt;br/&gt;Searches on the disk for a file with the following pattern: &amp;quot;&amp;lt;path&amp;gt;/&amp;lt;imzML&amp;gt;.&amp;lt;name&amp;gt;&amp;quot;&lt;br/&gt;&lt;br/&gt;&amp;lt;path&amp;gt;: Path pointing to the directory of the imzML file on disk&lt;br/&gt;&amp;lt;imzML&amp;gt;: File name of the imzML file without extension&lt;br/&gt;&amp;lt;name&amp;gt;: Name of the external normalization file, incl. file extension&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string>Regular Expression</string>
+          </property>
+          <property name="indent">
+           <number>0</number>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="lineEditExternalNormalization">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Enter the &amp;lt;name&amp;gt; of the file to be loaded as external normalization. This file must be placed next to the input imzML file.&lt;br/&gt;&lt;br/&gt;The entered text &amp;lt;name&amp;gt; is interpreted as a regular expression and. The search path &amp;lt;path&amp;gt; is the directory of the corresponding imzML file with name &amp;lt;imzML&amp;gt;.&lt;br/&gt;&lt;br/&gt;Searches on the disk for a file with the following pattern: &amp;quot;&amp;lt;path&amp;gt;/&amp;lt;imzML&amp;gt;.&amp;lt;name&amp;gt;&amp;quot;&lt;br/&gt;&lt;br/&gt;&amp;lt;path&amp;gt;: Path pointing to the directory of the imzML file on disk&lt;br/&gt;&amp;lt;imzML&amp;gt;: File name of the imzML file without extension&lt;br/&gt;&amp;lt;name&amp;gt;: Name of the external normalization file, incl. file extension&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="inputMask">
+           <string/>
+          </property>
+          <property name="text">
+           <string/>
+          </property>
+          <property name="placeholderText">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCommandLinkButton" name="btnLoadExternalNormalization">
+          <property name="enabled">
+           <bool>true</bool>
+          </property>
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Enter the &amp;lt;name&amp;gt; of the file to be loaded as external normalization. This file must be placed next to the input imzML file.&lt;br/&gt;&lt;br/&gt;The entered text &amp;lt;name&amp;gt; is interpreted as a regular expression and. The search path &amp;lt;path&amp;gt; is the directory of the corresponding imzML file with name &amp;lt;imzML&amp;gt;.&lt;br/&gt;&lt;br/&gt;Searches on the disk for a file with the following pattern: &amp;quot;&amp;lt;path&amp;gt;/&amp;lt;imzML&amp;gt;.&amp;lt;name&amp;gt;&amp;quot;&lt;br/&gt;&lt;br/&gt;&amp;lt;path&amp;gt;: Path pointing to the directory of the imzML file on disk&lt;br/&gt;&amp;lt;imzML&amp;gt;: File name of the imzML file without extension&lt;br/&gt;&amp;lt;name&amp;gt;: Name of the external normalization file, incl. file extension&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string>Load from disc</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
        <widget class="Line" name="line_2">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -651,6 +709,36 @@
          <string>Create image</string>
         </property>
        </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_6">
+        <item>
+         <widget class="QCheckBox" name="CBUseFixedLevel">
+          <property name="text">
+           <string>Fixed Level Window</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QDoubleSpinBox" name="spnBxLevel"/>
+        </item>
+        <item>
+         <widget class="QDoubleSpinBox" name="spnBxWindow"/>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer_2">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
       </item>
      </layout>
     </widget>

@@ -41,16 +41,20 @@ See LICENSE.txt for details.
 #include <mitkIPreferences.h>
 #include <mitkIPreferencesService.h>
 #include <mitkImageCast.h>
+#include <mitkIOUtil.h>
 #include <mitkLayoutAnnotationRenderer.h>
 #include <mitkLookupTableProperty.h>
 #include <mitkNodePredicateAnd.h>
 #include <mitkNodePredicateDataType.h>
 #include <mitkNodePredicateNot.h>
 #include <mitkNodePredicateOr.h>
+#include <mitkNodePredicateDataType.h>
 #include <mitkNodePredicateProperty.h>
 #include <mitkImagePixelWriteAccessor.h>
 #include <mitkImageVtkMapper2D.h>
+#include <mitkImageAccessByItk.h>
 #include <regex>
+// #include <Qm2AssociatedFilesDialog.h>
 
 const std::string m2Data::VIEW_ID = "org.mitk.views.m2.data";
 
@@ -87,6 +91,24 @@ void m2Data::CreateQtPartControl(QWidget *parent)
   connect(UIUtilsObject, SIGNAL(DecreaseTolerance()), this, SLOT(OnDecreaseTolerance()));
 
   connect(m_Controls.btnCreateShiftMap, SIGNAL(clicked()), this, SLOT(OnCreateShiftMap()));
+
+
+  // Position list/history
+  // connect(m_Controls.listWidgetPositions, &QTableWidget::cellDoubleClicked, this, [this](int row, int){
+  //   auto text = m_Controls.listWidgetPositions->item(row, 0)->text();
+  //   if (text == "Empty")
+  //     return;
+  //   if (row == 0){
+  //     m_Controls.listWidgetPositions->insertRow(0);
+  //     m_Controls.listWidgetPositions->setItem(0, 0, new QTableWidgetItem("Empty")); 
+  //   }
+  //   else
+  //   {
+  //     auto x = text.split(" ")[1].toDouble();
+  //     auto tol = text.split(" ")[3].toDouble();
+  //     this->OnGenerateImageData(x, tol);
+  //   }
+  // });
   
 
   // Settings (show hlper objects)
@@ -175,6 +197,7 @@ void m2Data::CreateQtPartControl(QWidget *parent)
     ++i;
   }
 
+
   connect(m_Controls.showIndexImages,
           &QCheckBox::toggled,
           this,
@@ -222,6 +245,7 @@ void m2Data::CreateQtPartControl(QWidget *parent)
             auto value = m_Controls.spnBxTol->value();
             preferences->PutFloat("m2aia.signal.Tolerance", value);
           });
+
   connect(m_Controls.CBNormalization,
           qOverload<int>(&QComboBox::currentIndexChanged),
           this,
@@ -229,8 +253,33 @@ void m2Data::CreateQtPartControl(QWidget *parent)
           {
             auto value = m_Controls.CBNormalization->currentData().toUInt();
             preferences->PutInt("m2aia.signal.NormalizationStrategy", value);
-            // MITK_INFO << "selected Method " << value;
+            if (static_cast<m2::NormalizationStrategyType>(value) == m2::NormalizationStrategyType::External)
+            {
+              m_Controls.labelLoadExternalNormalization->show();
+              m_Controls.btnLoadExternalNormalization->show();
+              m_Controls.lineEditExternalNormalization->show();
+            }
+            else
+            {
+              m_Controls.labelLoadExternalNormalization->hide();
+              m_Controls.btnLoadExternalNormalization->hide();
+              m_Controls.lineEditExternalNormalization->hide();
+            }
           });
+
+  auto value = m_Controls.CBNormalization->currentData().toUInt();
+  if (static_cast<m2::NormalizationStrategyType>(value) == m2::NormalizationStrategyType::External)
+  {
+    m_Controls.labelLoadExternalNormalization->show();
+    m_Controls.btnLoadExternalNormalization->show();
+    m_Controls.lineEditExternalNormalization->show();
+  }
+  else
+  {
+    m_Controls.labelLoadExternalNormalization->hide();
+    m_Controls.btnLoadExternalNormalization->hide();
+    m_Controls.lineEditExternalNormalization->hide();
+  }
 
   connect(m_Controls.CBTransformation,
           qOverload<int>(&QComboBox::currentIndexChanged),
@@ -721,6 +770,11 @@ void m2Data::OnGenerateImageData(mitk::DataNode::Pointer node,
     auto xMax = data->GetPropertyValue<double>("m2aia.xs.max");
     if (xRangeCenter > xMax || xRangeCenter < xMin){
       mitk::ImagePixelWriteAccessor<m2::DisplayImagePixelType, 3> acc(data);
+      auto N = std::accumulate(data->GetDimensions(), data->GetDimensions()+3, 1, std::multiplies<int>());
+      std::fill(acc.GetData(), acc.GetData() + N, 0);
+      UpdateLevelWindow(node);
+      this->RequestRenderWindowUpdate();
+
       return;
     }
 
@@ -742,7 +796,7 @@ void m2Data::OnGenerateImageData(mitk::DataNode::Pointer node,
     {
       auto image = future->result();
       UpdateLevelWindow(node);
-      UpdateSpectrumImageTable(node);
+      // UpdateSpectrumImageTable(node);
       node->SetProperty("m2aia.xs.selection.center", image->GetProperty("m2aia.xs.selection.center"));
       node->SetProperty("m2aia.xs.selection.tolerance", image->GetProperty("m2aia.xs.selection.tolerance"));
       this->RequestRenderWindowUpdate();
@@ -824,6 +878,20 @@ void m2Data::OnGenerateImageData(qreal xRangeCenter, qreal xRangeTol)
     bool isPpm = Controls()->rbtnTolPPM->isChecked();
     xRangeTol = isPpm ? m2::PartPerMillionToFactor(xRangeTol) * xRangeCenter : xRangeTol;
   }
+
+  // Add element to position list if not already present
+  // auto text = "m/z " + QString::number(xRangeCenter) + " ± " + QString::number(xRangeTol, 103, 3) + " Da";
+  // if(m_Controls.listWidgetPositions->rowCount() == 0){
+  //   m_Controls.listWidgetPositions->insertRow(0);
+  //   auto item = new QTableWidgetItem(text);
+  //   m_Controls.listWidgetPositions->setItem(0, 0, item);
+    
+
+
+  // }else{
+  //   m_Controls.listWidgetPositions->itemAt(0, 0)->setText(text);
+  // }
+
 
   
   emit m2::UIUtils::Instance()->RangeChanged(xRangeCenter, xRangeTol);
@@ -952,15 +1020,9 @@ void m2Data::UpdateLevelWindow(const mitk::DataNode *node)
     mitk::LevelWindow lw;
     node->GetLevelWindow(lw);
     lw.SetAuto(msImageBase);
-    switch(msImageBase->GetImageNormalizationStrategy()){
-      case m2::ImageNormalizationStrategyType::MinMax:
-      case m2::ImageNormalizationStrategyType::None:
-      case m2::ImageNormalizationStrategyType::zScore2Sigma:
-        lw.SetWindowBounds(0,lw.GetRangeMax());
-        break;
-      case m2::ImageNormalizationStrategyType::zScore:
-        lw.SetWindowBounds(-1,3);
-        break;
+    if (m_Controls.CBUseFixedLevel->isChecked())
+    {
+      lw.SetLevelWindow(m_Controls.spnBxLevel->value(), m_Controls.spnBxWindow->value());
     }
     const_cast<mitk::DataNode *>(node)->SetLevelWindow(lw);
   }
@@ -980,11 +1042,14 @@ void m2Data::NodeAdded(const mitk::DataNode *node)
     this->RequestRenderWindowUpdate();
 
     SpectrumImageNodeAdded(node);
-    // emit m2::UIUtils::Instance()->SpectrumImageNodeAdded(node);
-  }
-  else if (dynamic_cast<m2::IntervalVector *>(node->GetData()))
-  {
-    // emit m2::UIUtils::Instance()->SpectrumImageNodeAdded(node);
+    auto xs = data->GetXAxis();
+
+    if(m_Controls.spnBxMz->value() == 0)
+      this->OnGenerateImageData(xs[xs.size()/2], FROM_GUI);
+    else{
+      this->OnGenerateImageData(m_Controls.spnBxMz->value(), FROM_GUI);
+    }
+
   }
 }
 
@@ -1069,6 +1134,8 @@ void m2Data::FsmImageNodeAdded(const mitk::DataNode *)
 
 void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
 {
+
+
   auto nodes = GetDataStorage()->GetAll();
   // resolve name-conflicts
   if (std::any_of(nodes->begin(),
@@ -1124,13 +1191,34 @@ void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
       helperNode->SetData(spectrumImage->GetShiftImage());
       helperNode->SetStringProperty("m2aia.helper.image.name", "ShiftImage");
       this->GetDataStorage()->Add(helperNode, const_cast<mitk::DataNode *>(node));
-    // helperNode->SetStringProperty("m2aia.helper.image.type", "");
-
-    // add hidden to DS
-    // helperNode->SetBoolProperty("helper object", true);
-    // consideration of the check boxes
-    // emit m_Controls.showMaskImages->toggled(m_Controls.showMaskImages->isChecked());
     }
+
+    std::string inputLocation;
+    node->GetStringProperty("MITK.IO.reader.inputlocation", inputLocation);
+    auto fileName = itksys::SystemTools::GetFilenamePath(inputLocation) + "/" +
+    itksys::SystemTools::GetFilenameWithoutLastExtension(inputLocation) + ".tSNE.nrrd";
+    if(itksys::SystemTools::FileExists(fileName)){
+      auto tsneImages = mitk::IOUtil::Load(fileName);
+      helperNode = mitk::DataNode::New();
+      helperNode->SetName("tSNE");
+      helperNode->SetVisibility(false);
+      helperNode->SetData(tsneImages[0]);
+      helperNode->SetStringProperty("m2aia.helper.image.name", "tSNEImage");
+      this->GetDataStorage()->Add(helperNode, const_cast<mitk::DataNode *>(node));
+    }
+    
+    fileName = itksys::SystemTools::GetFilenamePath(inputLocation) + "/" +
+    itksys::SystemTools::GetFilenameWithoutLastExtension(inputLocation) + ".PCA.nrrd";
+    if(itksys::SystemTools::FileExists(fileName)){
+      auto pcaImages = mitk::IOUtil::Load(fileName);
+      helperNode = mitk::DataNode::New();
+      helperNode->SetName("PCA");
+      helperNode->SetVisibility(false);
+      helperNode->SetData(pcaImages[0]);
+      helperNode->SetStringProperty("m2aia.helper.image.name", "PCAImage");
+      this->GetDataStorage()->Add(helperNode, const_cast<mitk::DataNode *>(node));
+    }
+
 
     // -------------- add Index to datastorage --------------
     helperNode = mitk::DataNode::New();
@@ -1151,10 +1239,22 @@ void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
 
       helperNode = mitk::DataNode::New();
       helperNode->SetName("NormalizationImage" + m2::to_string(type));
-            helperNode->SetBoolProperty("binary", false);
+      helperNode->SetBoolProperty("binary", false);
       
       // here we add only the template images
       // initialization is done by UI interaction
+      
+      auto typeName = m2::NormalizationStrategyTypeNames[to_underlying(type)];
+      fileName = itksys::SystemTools::GetFilenamePath(inputLocation) + "/" +
+      itksys::SystemTools::GetFilenameWithoutLastExtension(inputLocation) + "." + typeName + ".nrrd";
+      
+      if(itksys::SystemTools::FileExists(fileName)){ 
+        auto dataVector = mitk::IOUtil::Load(fileName);
+        auto externalImage = dynamic_cast<mitk::Image *>(dataVector[0].GetPointer());
+        spectrumImage->SetNormalizationImage(externalImage, type);
+        spectrumImage->SetNormalizationImageStatus(type, true);
+      }
+      
       auto image = spectrumImage->GetNormalizationImage(type);
       helperNode->SetData(image); 
 
@@ -1200,17 +1300,17 @@ void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
       using namespace std;
       auto &i = intervals->GetIntervals();
       transform(begin(xs), end(xs), begin(ys), back_inserter(i), [](auto &a, auto &b) { return m2::Interval(a, b); });
-
+      
       intervalsNode->SetData(intervals);
       intervalsNode->SetName(name);
-      intervalsNode->SetVisibility(this->Controls()->visibleOnInitialization);
+      intervalsNode->SetVisibility(this->Controls()->visibleOnInitialization->isChecked() && !m_ResetPreventDataStorageOverload.isRunning());
       intervalsNode->SetBoolProperty("helper object", !checkState);
       m2::CopyNodeProperties(node, intervalsNode);
       if ((unsigned int)(type) & (unsigned int)(m2::SpectrumFormat::Centroid))
         intervalsNode->SetOpacity(1 - alpha);
-
-      this->GetDataStorage()->Add(intervalsNode, const_cast<mitk::DataNode *>(node));
       intervalsNode->Modified();
+      this->GetDataStorage()->Add(intervalsNode, const_cast<mitk::DataNode *>(node));     
+    
     };
 
     const auto &xs = spectrumImage->GetXAxis();
@@ -1254,6 +1354,10 @@ void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
                   m_Controls.showSingleSpectrum->isChecked(),
                   0.5);
     }
+
+    m_ResetPreventDataStorageOverload.cancel();
+    m_ResetPreventDataStorageOverload = QtConcurrent::run([](){
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));});
   }
 }
 
