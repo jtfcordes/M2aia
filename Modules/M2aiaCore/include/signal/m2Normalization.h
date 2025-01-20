@@ -40,6 +40,9 @@ namespace m2
     double TotalIonCurrent(MzItFirst mIt0, MzItLast mItEnd, IntItFirst iIt0) noexcept
     {
       double TIC = 0;
+      if(mIt0 == mItEnd)
+        return 1;
+        
       auto mIt1 = std::next(mIt0);
       auto iIt1 = std::next(iIt0);
       for (; mIt1 != mItEnd; ++mIt0, ++mIt1, ++iIt0, ++iIt1)
