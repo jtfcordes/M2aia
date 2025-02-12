@@ -26,7 +26,7 @@ namespace m2
   {
   public:
 	  struct Result {
-		  double meanEror, stdevError;
+		  double meanError, stdDevError;
 		  std::vector<std::vector<double>> errorsPoints;
 	  };
 

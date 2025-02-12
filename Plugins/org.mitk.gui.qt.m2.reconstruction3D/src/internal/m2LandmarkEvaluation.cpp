@@ -139,15 +139,15 @@ m2::LandMarkEvaluation::Result m2::LandMarkEvaluation::EvaluatePointSet(const mi
   }
 
   const auto meanError = std::accumulate(std::begin(errors), std::end(errors), 0.0) / float(errors.size());
-  auto stdevError =
+  auto stdDevError =
     std::sqrt(std::accumulate(std::begin(errors),
                               std::end(errors),
                               0.0,
                               [&meanError](auto s, auto x) { return s + (x - meanError) * (x - meanError); }) /
               float(errors.size()));
-  MITK_INFO << meanError << " +- " << stdevError << "\n";
-  r.meanEror = meanError;
-  r.stdevError = stdevError;
+  MITK_INFO << meanError << " +- " << stdDevError << "\n";
+  r.meanError = meanError;
+  r.stdDevError = stdDevError;
 
   return r;
 }

@@ -29,6 +29,8 @@ See LICENSE.txt or https://www.github.com/jtfcordes/m2aia for details.
 #include <mitkNodePredicateDataType.h>
 #include <mitkProgressBar.h>
 #include <mitkNodePredicateOr.h>
+#include <mitkImageAccessByItk.h>
+#include <mitkImageCast.h>
 
 // m2aia
 #include "m2Reconstruction3D.h"
@@ -184,6 +186,7 @@ std::shared_ptr<m2::ElxRegistrationHelper> m2Reconstruction3D::RegistrationStep(
 
   std::vector<std::string> parameters = GetParameters();
 
+
   // start of the registration procedure
   auto elxHelper = std::make_shared<m2::ElxRegistrationHelper>();
   elxHelper->SetImageData(fixedImage, movingData.image);
@@ -191,7 +194,7 @@ std::shared_ptr<m2::ElxRegistrationHelper> m2Reconstruction3D::RegistrationStep(
   elxHelper->GetRegistration();
 
   return elxHelper;
-};
+}
 
 std::vector<std::string> m2Reconstruction3D::GetParameters()
 {
@@ -347,7 +350,7 @@ void m2Reconstruction3D::OnStartStacking()
         auto M1 = GetImageDataById(currentRow, m_List1);
         auto elxHelper = std::make_shared<m2::ElxRegistrationHelper>();
         elxHelper->SetImageData(M1.image, M1.image);
-        elxHelper->SetRegistrationParameters({}); // identity
+        elxHelper->SetRegistrationParameters({});
         spectrumImageStack1->Insert(currentRow, elxHelper);
         futureInterface.setProgressValue(++progress);
       }
@@ -360,9 +363,11 @@ void m2Reconstruction3D::OnStartStacking()
         futureInterface.setProgressValue(++progress);
       }
         
-      auto f0 = QtConcurrent::run(
+      QFutureWatcher<void> watcher0;
+      watcher0.setFuture(QtConcurrent::run(
         [&]()
         {
+          QFutureInterface<void> futureInterface;
           for (int movingId = currentRow - 1; movingId >= 0; --movingId)
           {
             // stack 1
@@ -374,16 +379,20 @@ void m2Reconstruction3D::OnStartStacking()
             // stack 2
             if (doMultiModalImageRegistration)
             {
-              elxHelper = RegistrationStep(movingId, m_List1, elxHelper, movingId, m_List2);
+                elxHelper = RegistrationStep(movingId, m_List1, elxHelper, movingId, m_List2);
+
               spectrumImageStack2->Insert(movingId, elxHelper);
             }
+         
             futureInterface.setProgressValue(++progress);
           }
-        });
+        }));
 
-      auto f1 = QtConcurrent::run(
+      QFutureWatcher<void> watcher1;
+      watcher1.setFuture(QtConcurrent::run(
         [&]()
             {
+              QFutureInterface<void> futureInterface;
               for (int movingId = currentRow + 1; movingId < numItems; ++movingId)
               {
                 // stack 1
@@ -401,10 +410,14 @@ void m2Reconstruction3D::OnStartStacking()
                 futureInterface.setProgressValue(++progress);
               }
             }
+        )
         );
 
-      f0.waitForFinished();
-      f1.waitForFinished();
+      watcher0.waitForFinished();
+      watcher1.waitForFinished();
+
+      
+      
 
       spectrumImageStack1->InitializeProcessor();
       spectrumImageStack1->InitializeGeometry();
