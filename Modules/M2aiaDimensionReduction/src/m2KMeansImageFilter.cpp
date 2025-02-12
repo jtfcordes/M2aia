@@ -111,26 +111,6 @@ void m2::KMeansImageFilter::GenerateData()
     }
 
     clusteredImage->InitializeByLabeledImage(clusteredImage->Clone());
-
-    //   if(imageId > 0 && m_Outputs.find(0) != m_Outputs.end()){
-    //     auto refClusterImage = dynamic_cast<mitk::LabelSetImage *>(this->GetOutput(0).GetPointer());
-    //     auto refClusterImageConst = const_cast<const mitk::LabelSetImage *>(refClusterImage);
-    //     mitk::LabelSetImage::ConstLabelVectorType layer = refClusterImageConst->GetLabels();
-    //     clusteredImage->AddLayer(layer);
-
-    //   }
-
-    //   for (unsigned long i = 0; i < m_NumberOfClusters; ++i)
-    //   {
-    //     mitk::Label::Pointer label = mitk::Label::New();
-    //     label->SetName("Cluster " + std::to_string(i));
-    //     label->SetValue(i);
-    //     label->SetOpacity(1);
-    //     label->SetColor(m2::RandomColor());
-    //     clusteredImage->AddLabel(label, 0);
-    //   }
-
-    //   clusteredImage->SetActiveLayer(0);
   }
 }
 
@@ -164,34 +144,35 @@ void m2::KMeansImageFilter::DoKMeans(const Eigen::MatrixXd &data, int k, std::ve
   // Randomly initialize centroids
 
   MITK_INFO << "Start KMeans: rows: " << data.rows() << " cols: " << data.cols();
+  
 
-  std::vector<Eigen::VectorXd> centroids(k);
+  m_Centroids = std::vector<Eigen::VectorXd>(k);
   for (int i = 0; i < k; ++i)
   {
-    centroids[i] = data.row(rand() % data.rows());
+    m_Centroids[i] = data.row(rand() % data.rows());
   }
+
+  Eigen::VectorXd overallMean = data.colwise().mean();
 
   bool centroidsChanged = true;
   while (centroidsChanged)
   {
     centroidsChanged = false;
 
-    // Assign each point to the nearest centroid
-// #pragma omp parallel for
     for (int i = 0; i < data.rows(); ++i)
     {
       double minDistance = std::numeric_limits<double>::max();
       int closestCentroid = -1;
       for (int j = 0; j < k; ++j)
       {
-        double distance = euclideanDistance(data.row(i), centroids[j]);
+        double distance = euclideanDistance(data.row(i), m_Centroids[j]);
         if (distance < minDistance)
         {
           minDistance = distance;
           closestCentroid = j;
         }
       }
-// #pragma omp critical
+
       {
         if (clusterAssignments[i] != closestCentroid)
         {
@@ -201,8 +182,6 @@ void m2::KMeansImageFilter::DoKMeans(const Eigen::MatrixXd &data, int k, std::ve
       }
     }
 
-    // Update centroids
-// #pragma omp parallel for
     for (int i = 0; i < k; ++i)
     {
       Eigen::VectorXd newCentroid = Eigen::VectorXd::Zero(data.cols());
@@ -219,10 +198,24 @@ void m2::KMeansImageFilter::DoKMeans(const Eigen::MatrixXd &data, int k, std::ve
       {
         newCentroid /= count;
       }
-// #pragma omp critical
+
       {
-        centroids[i] = newCentroid;
+        // newCentroid = (1 - m_ShrinkageFactor) * newCentroid + m_ShrinkageFactor * overallMean;
+
+        m_Centroids[i] = newCentroid;
       }
     }
+
   }
+
+
+  MITK_INFO << "KMeans finished";
+  MITK_INFO << "Centroids: ";
+  for (int i = 0; i < k; ++i)
+  {
+    MITK_INFO << m_Centroids[i].transpose();
+  }
+
+
+
 }

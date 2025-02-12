@@ -39,6 +39,9 @@ private:
     // stores for each input the valid indices (masked pixels are valid)
     std::map<int, std::vector<itk::Index<3>>> m_ValidIndicesMap;
 
+    double m_ShrinkageFactor = 0.1;
+
+
 public:
     mitkClassMacroItkParent(KMeansImageFilter, itk::Object);
     itkFactorylessNewMacro(Self);
@@ -46,6 +49,11 @@ public:
     typedef mitk::LabelSetImage OutputType;
 
     itkSetMacro(NumberOfClusters, unsigned int);
+    itkGetMacro(NumberOfClusters, unsigned int);
+    itkSetMacro(ShrinkageFactor, double);
+    itkGetMacro(ShrinkageFactor, double);
+
+
     void GenerateData();
     
     void SetInput(m2::SpectrumImage::Pointer image, int idx = 0)
@@ -73,6 +81,7 @@ private:
 
     std::vector<m2::Interval> m_Intervals;
     unsigned int m_NumberOfClusters = 0;
+    std::vector<Eigen::VectorXd> m_Centroids;
 };
 
 } // end namespace m2
