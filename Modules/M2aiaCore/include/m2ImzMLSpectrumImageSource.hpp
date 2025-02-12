@@ -1027,7 +1027,7 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
   const unsigned int threads = p->GetNumberOfThreads();
   const auto currentType = p->GetNormalizationStrategy();
   
-  using NormalizationImageAccessorType = mitk::ImagePixelReadAccessor<m2::DisplayImagePixelType, 3>;
+  using NormalizationImageAccessorType = mitk::ImagePixelReadAccessor<m2::NormImagePixelType, 3>;
   auto accNorm = std::make_shared<NormalizationImageAccessorType>(p->GetNormalizationImage(currentType)); 
   
   using ShiftImageAccessorType = mitk::ImagePixelReadAccessor<m2::ShiftImageType, 3>;
@@ -1058,7 +1058,7 @@ void m2::ImzMLSpectrumImageSource<MassAxisType, IntensityType>::InitializeImageA
     mzAxis.clear();
     mzAxis.reserve(L);
 
-    
+      
     auto mzAxisIt = std::back_inserter(mzAxis);
     // **** extrapolate mz values (right)
     const auto lowMzDelta = mzs[1] - mzs[0];
