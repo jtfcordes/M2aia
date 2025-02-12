@@ -6,6 +6,7 @@ set(SRC_CPP_FILES
 set(INTERNAL_CPP_FILES
   org_mitk_gui_qt_m2_common_Activator.cpp
   m2BrowserPreferencesPage.cpp
+  QmitkDataNodeConvertToRGBImageAction.cpp
   QmitkDataNodeConvertPixelTypeAction.cpp
   QmitkDataNodeExportComponentAction.cpp
   QmitkDataNodeReimportImageAction.cpp
@@ -27,6 +28,7 @@ set(MOC_H_FILES
   src/m2UIUtils.h
   src/Qm2NameDialog.h
   # src/Qm2AssociatedFilesDialog.h
+  src/internal/QmitkDataNodeConvertToRGBImageAction.h
   src/internal/QmitkDataNodeConvertPixelTypeAction.h
   src/internal/QmitkDataNodeExportComponentAction.h
   src/internal/QmitkDataNodePlotColorAction.h
