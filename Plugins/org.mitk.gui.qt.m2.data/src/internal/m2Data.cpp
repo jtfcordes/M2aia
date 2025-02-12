@@ -253,33 +253,7 @@ void m2Data::CreateQtPartControl(QWidget *parent)
           {
             auto value = m_Controls.CBNormalization->currentData().toUInt();
             preferences->PutInt("m2aia.signal.NormalizationStrategy", value);
-            if (static_cast<m2::NormalizationStrategyType>(value) == m2::NormalizationStrategyType::External)
-            {
-              m_Controls.labelLoadExternalNormalization->show();
-              m_Controls.btnLoadExternalNormalization->show();
-              m_Controls.lineEditExternalNormalization->show();
-            }
-            else
-            {
-              m_Controls.labelLoadExternalNormalization->hide();
-              m_Controls.btnLoadExternalNormalization->hide();
-              m_Controls.lineEditExternalNormalization->hide();
-            }
           });
-
-  auto value = m_Controls.CBNormalization->currentData().toUInt();
-  if (static_cast<m2::NormalizationStrategyType>(value) == m2::NormalizationStrategyType::External)
-  {
-    m_Controls.labelLoadExternalNormalization->show();
-    m_Controls.btnLoadExternalNormalization->show();
-    m_Controls.lineEditExternalNormalization->show();
-  }
-  else
-  {
-    m_Controls.labelLoadExternalNormalization->hide();
-    m_Controls.btnLoadExternalNormalization->hide();
-    m_Controls.lineEditExternalNormalization->hide();
-  }
 
   connect(m_Controls.CBTransformation,
           qOverload<int>(&QComboBox::currentIndexChanged),
@@ -394,6 +368,12 @@ void m2Data::CreateQtPartControl(QWidget *parent)
               watcher.reset();
             });
   }
+
+
+  connect(&m_ResetPreventDataStorageOverload, &QFutureWatcher<void>::finished, this, [this]() {
+    mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->GetDataStorage());
+    this->RequestRenderWindowUpdate();
+  });
 }
 
 void m2Data::InitToleranceControls()
@@ -1039,17 +1019,15 @@ void m2Data::NodeAdded(const mitk::DataNode *node)
     // !! Primary initialization !!
     this->ApplySettingsToImage(data);
     data->InitializeImageAccess();
-    this->RequestRenderWindowUpdate();
+    // this->RequestRenderWindowUpdate();
 
     SpectrumImageNodeAdded(node);
     auto xs = data->GetXAxis();
 
     if(m_Controls.spnBxMz->value() == 0)
       this->OnGenerateImageData(xs[xs.size()/2], FROM_GUI);
-    else{
+    else
       this->OnGenerateImageData(m_Controls.spnBxMz->value(), FROM_GUI);
-    }
-
   }
 }
 
@@ -1356,8 +1334,8 @@ void m2Data::SpectrumImageNodeAdded(const mitk::DataNode *node)
     }
 
     m_ResetPreventDataStorageOverload.cancel();
-    m_ResetPreventDataStorageOverload = QtConcurrent::run([](){
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));});
+    m_ResetPreventDataStorageOverload.setFuture(QtConcurrent::run([](){
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));}));
   }
 }
 

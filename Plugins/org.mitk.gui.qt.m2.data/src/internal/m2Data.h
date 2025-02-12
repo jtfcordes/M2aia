@@ -120,7 +120,7 @@ signals:
 protected:
   void CreateQtPartControl(QWidget *parent) override;
   void NodeAdded(const mitk::DataNode *node) override;
-  QFuture<void> m_ResetPreventDataStorageOverload;
+  QFutureWatcher<void> m_ResetPreventDataStorageOverload;
   void NodeRemoved(const mitk::DataNode *node) override;
   void SetFocus() override {}
 
